@@ -21,32 +21,19 @@ const app = express();
 // ====================== CORS CONFIGURATION ======================
 const corsOptions = {
   origin: [
-    'https://online-qcm.vercel.app',   // ← Your production frontend
-    'http://localhost:5173',           // Vite (most common)
-    'http://localhost:3000',           // React/Create React App
+    'https://online-qcm.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Length'],
-  maxAge: 86400, // 24 hours preflight cache
+  maxAge: 86400,
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
-
-// Handle preflight (OPTIONS) requests explicitly - Very important for Railway + Vercel
-app.options('*', cors(corsOptions));
-
-// Additional security headers (helps in some edge cases)
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (['https://online-qcm.vercel.app', 'http://localhost:5173', 'http://localhost:3000'].includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
 
 // Body parsers
 app.use(express.json());
@@ -73,6 +60,5 @@ const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📡 API Base URL: http://localhost:${PORT}`);
-  console.log(`🌐 Frontend allowed: https://online-qcm.vercel.app`);
+  console.log(`🌐 Allowed Frontend: https://online-qcm.vercel.app`);
 });
