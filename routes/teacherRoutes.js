@@ -1,7 +1,7 @@
 // 
 
-// const express = require('express');
-const router = express.Router();     
+const express = require('express');
+const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const {
   getMySubjects,
@@ -13,9 +13,6 @@ const {
   getMyReports
 } = require('../controllers/teacherController');
 
-const router = express.Router();
-
-// All teacher routes require authentication
 router.use(protect);
 
 router.get('/subjects', getMySubjects);
