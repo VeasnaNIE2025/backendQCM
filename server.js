@@ -34,4 +34,21 @@ app.get('/', (req, res) => res.json({ message: 'QCM Exam System API' }));
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
+  // ... កូដខាងលើ
+
+console.log("🚀 Loading routes...");
+
+app.use('/api/auth', require('./routes/authRoutes'));
+console.log("✅ Auth routes loaded successfully");
+
+app.use('/api/admin', require('./routes/adminRoutes'));
+console.log("✅ Admin routes loaded");
+
+app.use('/api/student', require('./routes/studentRoutes'));
+console.log("✅ Student routes loaded");
+
+app.use('/api/teacher', require('./routes/teacherRoutes'));
+console.log("✅ Teacher routes loaded");
+
+// ... រក្សាទុក
 });
