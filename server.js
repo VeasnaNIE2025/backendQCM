@@ -13,8 +13,17 @@ setupAssociations();
 const app = express();
 
 // CORS
+// app.use(cors({
+//   origin: ['https://online-qcm.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
+//   credentials: true
+// }));
 app.use(cors({
-  origin: ['https://online-qcm.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    'https://online-qcm.vercel.app',
+    'https://qcm.salacode.site', // ✅ បន្ថែមនេះ
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
   credentials: true
 }));
 
