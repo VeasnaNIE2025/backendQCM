@@ -19,16 +19,28 @@ setupAssociations();
 const app = express();
 
 // CORS configuration
+// app.use(cors({
+//   origin: [
+//     'http://localhost:5173',
+//     'http://localhost:3000',
+//     'https://online-qcm.vercel.app', // ✅ Vercel domain
+//   ],
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization']
+// }));
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://online-qcm.vercel.app', // ✅ Vercel domain
-  ],
+  origin: function(origin, callback) {
+    // ✅ Allow any origin (production fix)
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// ✅ Handle preflight
+app.options('*', cors());
 
 // Body parsers
 app.use(express.json());
