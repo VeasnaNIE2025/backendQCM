@@ -3,9 +3,7 @@ const { sequelize } = require('../config/db');
 // ✅ Helper: Parse DB date string as UTC
 const parseUTC = (str) => {
   if (!str) return null;
-  // ✅ ប្រសិនបើ Sequelize return Date Object រួចហើយ
   if (str instanceof Date) return str;
-  // ✅ ប្រសិនបើជា String
   const s = str.toString().trim();
   return new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
 };
@@ -14,7 +12,6 @@ const parseUTC = (str) => {
 const getAvailableExams = async (req, res) => {
   try {
     const now = new Date();
-    // ✅ Format now as UTC string for DB comparison
     const nowUTC = now.toISOString().slice(0, 19).replace('T', ' ');
 
     const exams = await sequelize.query(
@@ -62,17 +59,8 @@ const getExamDetails = async (req, res) => {
     const isRandomMode = examData.numberOfQuestions && examData.numberOfQuestions > 0;
 
     const now = new Date();
-    // ✅ Parse DB dates as UTC
     const startDate = parseUTC(examData.startDate);
     const endDate = parseUTC(examData.endDate);
-
-    console.log('getExamDetails - time check:', {
-      now: now.toISOString(),
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      notStarted: now < startDate,
-      expired: now > endDate,
-    });
 
     if (now < startDate) {
       return res.status(400).json({ message: 'ការប្រឡងមិនទាន់ចាប់ផ្តើម' });
@@ -81,7 +69,6 @@ const getExamDetails = async (req, res) => {
       return res.status(400).json({ message: 'ការប្រឡងបានបញ្ចប់ហើយ' });
     }
 
-    // Check if student already took this exam
     const existingResult = await sequelize.query(
       `SELECT * FROM exam_results WHERE examId = :examId AND studentId = :studentId AND status = 'completed'`,
       {
@@ -94,7 +81,6 @@ const getExamDetails = async (req, res) => {
       return res.status(400).json({ message: 'អ្នកបានធ្វើការប្រឡងនេះរួចហើយ' });
     }
 
-    // Check if student already has assigned questions
     let studentQuestions = await sequelize.query(
       `SELECT * FROM student_exam_questions WHERE examId = :examId AND studentId = :studentId`,
       {
@@ -125,48 +111,54 @@ const getExamDetails = async (req, res) => {
             `INSERT INTO student_exam_questions (examId, studentId, questionId, \`order\`) 
              VALUES (:examId, :studentId, :questionId, :order)`,
             {
-              replacements: {
-                examId,
-                studentId,
-                questionId: availableQuestions[i].id,
-                order: i
-              },
+              replacements: { examId, studentId, questionId: availableQuestions[i].id, order: i },
               type: sequelize.QueryTypes.INSERT
             }
           );
         }
 
-        // Random mode: 1 point per question
         questions = availableQuestions.map(q => ({ ...q, points: 1 }));
       } else {
-        // Manual mode: use points from database
-        questions = await sequelize.query(
-          `SELECT q.*, eq.order 
+        // ✅ FIX: Manual mode — insert into student_exam_questions ផង
+        // ដើម្បីឱ្យ submitExam រក questions បានត្រឹមត្រូវ
+        const manualQuestions = await sequelize.query(
+          `SELECT q.*, eq.\`order\`
            FROM exam_questions eq 
            LEFT JOIN questions q ON eq.questionId = q.id 
            WHERE eq.examId = :examId 
-           ORDER BY eq.order ASC`,
+           ORDER BY eq.\`order\` ASC`,
           {
             replacements: { examId },
             type: sequelize.QueryTypes.SELECT
           }
         );
+
+        for (let i = 0; i < manualQuestions.length; i++) {
+          await sequelize.query(
+            `INSERT INTO student_exam_questions (examId, studentId, questionId, \`order\`) 
+             VALUES (:examId, :studentId, :questionId, :order)`,
+            {
+              replacements: { examId, studentId, questionId: manualQuestions[i].id, order: i },
+              type: sequelize.QueryTypes.INSERT
+            }
+          );
+        }
+
+        questions = manualQuestions;
       }
     } else {
-      // Get previously assigned questions
       questions = await sequelize.query(
-        `SELECT q.*, seq.order 
+        `SELECT q.*, seq.\`order\`
          FROM student_exam_questions seq 
          LEFT JOIN questions q ON seq.questionId = q.id 
          WHERE seq.examId = :examId AND seq.studentId = :studentId 
-         ORDER BY seq.order ASC`,
+         ORDER BY seq.\`order\` ASC`,
         {
           replacements: { examId, studentId },
           type: sequelize.QueryTypes.SELECT
         }
       );
 
-      // Random mode: override points to 1 per question
       if (isRandomMode) {
         questions = questions.map(q => ({ ...q, points: 1 }));
       }
@@ -183,13 +175,27 @@ const getExamDetails = async (req, res) => {
 const submitExam = async (req, res) => {
   try {
     const examId = req.params.id;
-    const { answers } = req.body;
     const studentId = req.user.id;
 
+    // ✅ FIX: Support both Array និង Object format សម្រាប់ answers
+    // Frontend (TakeExam.jsx) send: Object.values(answers) → Array ['a', 'b', ...]
+    // Backend ត្រូវការ: index-based access answers[i]
+    let { answers } = req.body;
+
     console.log('========== SUBMIT EXAM ==========');
-    console.log('ExamId:', examId);
-    console.log('StudentId:', studentId);
-    console.log('Answers:', answers);
+    console.log('ExamId:', examId, '| StudentId:', studentId);
+    console.log('Answers raw:', answers, '| Type:', typeof answers);
+
+    // ✅ Normalize answers → Array ជានិច្ច
+    if (!answers) {
+      answers = [];
+    } else if (!Array.isArray(answers)) {
+      // ប្រសិនបើ object {0: 'a', 1: 'b'} → convert to array
+      const maxIdx = Math.max(...Object.keys(answers).map(Number));
+      answers = Array.from({ length: maxIdx + 1 }, (_, i) => answers[i] || '');
+    }
+
+    console.log('Answers normalized:', answers);
 
     const exam = await sequelize.query(
       `SELECT e.*, s.name as subjectName 
@@ -208,43 +214,55 @@ const submitExam = async (req, res) => {
 
     const examData = exam[0];
     const isRandomMode = examData.numberOfQuestions && examData.numberOfQuestions > 0;
-    console.log('Exam title:', examData.title);
-    console.log('Random mode:', isRandomMode);
 
-    // Get questions for this student
-    let questions = await sequelize.query(
-      `SELECT q.id, q.points, q.correctAnswer, seq.order 
-       FROM student_exam_questions seq 
-       LEFT JOIN questions q ON seq.questionId = q.id 
-       WHERE seq.examId = :examId AND seq.studentId = :studentId 
-       ORDER BY seq.order ASC`,
+    // ✅ FIX: Check duplicate submit មុន insert
+    const existingResult = await sequelize.query(
+      `SELECT id FROM exam_results WHERE examId = :examId AND studentId = :studentId AND status = 'completed'`,
       {
         replacements: { examId, studentId },
         type: sequelize.QueryTypes.SELECT
       }
     );
+
+    if (existingResult.length > 0) {
+      return res.status(400).json({ message: 'អ្នកបានបញ្ជូនចម្លើយរួចហើយ' });
+    }
+
+    // Get questions for this student (always from student_exam_questions)
+    let questions = await sequelize.query(
+      `SELECT q.id, q.points, q.correctAnswer, seq.\`order\`
+       FROM student_exam_questions seq 
+       LEFT JOIN questions q ON seq.questionId = q.id 
+       WHERE seq.examId = :examId AND seq.studentId = :studentId 
+       ORDER BY seq.\`order\` ASC`,
+      {
+        replacements: { examId, studentId },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
     console.log('Questions from student_exam_questions:', questions.length);
 
+    // ✅ Fallback: exam_questions (សម្រាប់ exam ចាស់មុន fix)
     if (questions.length === 0) {
       questions = await sequelize.query(
-        `SELECT q.id, q.points, q.correctAnswer, eq.order 
+        `SELECT q.id, q.points, q.correctAnswer, eq.\`order\`
          FROM exam_questions eq 
          LEFT JOIN questions q ON eq.questionId = q.id 
          WHERE eq.examId = :examId 
-         ORDER BY eq.order ASC`,
+         ORDER BY eq.\`order\` ASC`,
         {
           replacements: { examId },
           type: sequelize.QueryTypes.SELECT
         }
       );
-      console.log('Questions from exam_questions:', questions.length);
+      console.log('Fallback - Questions from exam_questions:', questions.length);
     }
 
     if (questions.length === 0) {
       return res.status(404).json({ message: 'មិនឃើញសំណួរសម្រាប់ការប្រឡងនេះ' });
     }
 
-    // Random mode: 1 point per question | Manual mode: use database points
     if (isRandomMode) {
       questions = questions.map(q => ({ ...q, points: 1 }));
     }
@@ -255,9 +273,11 @@ const submitExam = async (req, res) => {
 
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
-      const userAnswer = (answers && answers[i]) ? answers[i] : '';
-      const isCorrect = userAnswer.toLowerCase() === (question.correctAnswer || '').toLowerCase();
-      const pointsEarned = isCorrect ? (question.points || 0) : 0;
+      // ✅ FIX: Safe access — empty string ប្រសិនបើគ្មានចម្លើយ
+      const userAnswer = (answers[i] || '').toString().toLowerCase().trim();
+      const correctAnswer = (question.correctAnswer || '').toString().toLowerCase().trim();
+      const isCorrect = userAnswer !== '' && userAnswer === correctAnswer;
+      const pointsEarned = isCorrect ? (question.points || 1) : 0;
       totalScore += pointsEarned;
 
       studentAnswers.push({
@@ -268,12 +288,10 @@ const submitExam = async (req, res) => {
       });
     }
 
-    const actualTotalPoints = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+    const actualTotalPoints = questions.reduce((sum, q) => sum + (q.points || 1), 0);
     const percentage = actualTotalPoints > 0 ? (totalScore / actualTotalPoints) * 100 : 0;
 
-    console.log('Total score:', totalScore);
-    console.log('Total points:', actualTotalPoints);
-    console.log('Percentage:', percentage);
+    console.log(`Score: ${totalScore}/${actualTotalPoints} = ${percentage.toFixed(2)}%`);
 
     // Save result
     const result = await sequelize.query(
@@ -286,7 +304,7 @@ const submitExam = async (req, res) => {
     );
 
     const resultId = result[0];
-    console.log('Result saved with ID:', resultId);
+    console.log('Result saved ID:', resultId);
 
     // Save answers
     for (const answer of studentAnswers) {
@@ -298,7 +316,7 @@ const submitExam = async (req, res) => {
             resultId,
             questionId: answer.questionId,
             selectedOption: answer.selectedOption,
-            isCorrect: answer.isCorrect,
+            isCorrect: answer.isCorrect ? 1 : 0,
             pointsEarned: answer.pointsEarned
           },
           type: sequelize.QueryTypes.INSERT
@@ -306,7 +324,7 @@ const submitExam = async (req, res) => {
       );
     }
 
-    console.log('Submit exam completed successfully');
+    console.log('Submit completed ✅');
     console.log('================================');
 
     res.json({
@@ -317,12 +335,9 @@ const submitExam = async (req, res) => {
       answers: studentAnswers
     });
   } catch (error) {
-    console.error('ERROR in submitExam:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      message: 'កំហុសប្រព័ន្ធ',
-      error: error.message
-    });
+    console.error('ERROR in submitExam:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ message: 'កំហុសប្រព័ន្ធ', error: error.message });
   }
 };
 
