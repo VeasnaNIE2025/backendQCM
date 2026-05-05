@@ -31,7 +31,6 @@ const app = express();
 // }));
 app.use(cors({
   origin: function(origin, callback) {
-    // ✅ Allow any origin (production fix)
     callback(null, true);
   },
   credentials: true,
@@ -39,10 +38,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ✅ Handle preflight
-app.options('/(.*)', cors());
-
-// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
