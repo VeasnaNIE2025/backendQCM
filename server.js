@@ -18,22 +18,41 @@ setupAssociations();
 
 const app = express();
 
-// CORS configuration
-app.use(cors({
+// ====================== CORS CONFIGURATION ======================
+const corsOptions = {
   origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://online-qcm.vercel.app',
+    'https://online-qcm.vercel.app',   // ← Your production frontend
+    'http://localhost:5173',           // Vite (most common)
+    'http://localhost:3000',           // React/Create React App
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length'],
+  maxAge: 86400, // 24 hours preflight cache
+};
 
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight (OPTIONS) requests explicitly - Very important for Railway + Vercel
+app.options('*', cors(corsOptions));
+
+// Additional security headers (helps in some edge cases)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (['https://online-qcm.vercel.app', 'http://localhost:5173', 'http://localhost:3000'].includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== ROUTES ====================
+// ====================== ROUTES ======================
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/student', require('./routes/studentRoutes'));
@@ -49,12 +68,11 @@ app.get('/', (req, res) => {
   res.json({ message: 'QCM Exam System API' });
 });
 
-// ==================== START SERVER ====================
+// ====================== START SERVER ======================
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}`);
-  console.log(`📚 Subjects API: http://localhost:${PORT}/api/admin/subjects`);
-  console.log(`❓ Questions API: http://localhost:${PORT}/api/admin/questions`);
-  console.log(`👥 Users API: http://localhost:${PORT}/api/admin/users`);
+  console.log(`📡 API Base URL: http://localhost:${PORT}`);
+  console.log(`🌐 Frontend allowed: https://online-qcm.vercel.app`);
 });
