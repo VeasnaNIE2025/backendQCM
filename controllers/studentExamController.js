@@ -295,8 +295,8 @@ const submitExam = async (req, res) => {
 
     // Save result
     const result = await sequelize.query(
-      `INSERT INTO exam_results (examId, studentId, totalScore, percentage, submittedAt, status) 
-       VALUES (:examId, :studentId, :totalScore, :percentage, NOW(), 'completed')`,
+      `INSERT INTO exam_results (examId, studentId, totalScore, percentage, submittedAt, status, createdAt, updatedAt) 
+       VALUES (:examId, :studentId, :totalScore, :percentage, NOW(), 'completed', NOW(), NOW())`,
       {
         replacements: { examId, studentId, totalScore, percentage },
         type: sequelize.QueryTypes.INSERT
@@ -309,8 +309,8 @@ const submitExam = async (req, res) => {
     // Save answers
     for (const answer of studentAnswers) {
       await sequelize.query(
-        `INSERT INTO student_answers (resultId, questionId, selectedOption, isCorrect, pointsEarned) 
-         VALUES (:resultId, :questionId, :selectedOption, :isCorrect, :pointsEarned)`,
+        `INSERT INTO student_answers (resultId, questionId, selectedOption, isCorrect, pointsEarned, createdAt, updatedAt) 
+         VALUES (:resultId, :questionId, :selectedOption, :isCorrect, :pointsEarned, NOW(), NOW())`,
         {
           replacements: {
             resultId,
