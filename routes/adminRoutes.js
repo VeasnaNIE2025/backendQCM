@@ -1,43 +1,3 @@
-// const express = require('express');
-// const { protect, admin } = require('../middleware/authMiddleware');
-// const {
-//   getUsers, getUserById, createUser, updateUser, deleteUser
-// } = require('../controllers/userController');
-// const {
-//   getSubjects, getSubjectById, createSubject, updateSubject, deleteSubject
-// } = require('../controllers/subjectController');
-// const {
-//   getQuestions, getQuestionById, createQuestion, updateQuestion, deleteQuestion
-// } = require('../controllers/questionController');
-
-// const router = express.Router();
-
-// // All routes require authentication and admin role
-// router.use(protect, admin);
-
-// // ==================== USER ROUTES ====================
-// router.get('/users', getUsers);
-// router.get('/users/:id', getUserById);
-// router.post('/users', createUser);
-// router.put('/users/:id', updateUser);
-// router.delete('/users/:id', deleteUser);
-
-// // ==================== SUBJECT ROUTES ====================
-// router.get('/subjects', getSubjects);
-// router.get('/subjects/:id', getSubjectById);
-// router.post('/subjects', createSubject);
-// router.put('/subjects/:id', updateSubject);
-// router.delete('/subjects/:id', deleteSubject);
-
-// // ==================== QUESTION ROUTES ====================
-// router.get('/questions', getQuestions);
-// router.get('/questions/:id', getQuestionById);
-// router.post('/questions', createQuestion);
-// router.put('/questions/:id', updateQuestion);
-// router.delete('/questions/:id', deleteQuestion);
-
-// module.exports = router;
-
 const express = require('express');
 const { protect, admin } = require('../middleware/authMiddleware');
 const {
@@ -71,6 +31,16 @@ const {
 
 
 const router = express.Router();
+
+const upload = require('../middleware/upload');
+
+// Upload image to Cloudinary
+router.post('/upload-image', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+  res.json({ imageUrl: req.file.path });
+});
 
 // All routes require authentication and admin role
 router.use(protect, admin);
