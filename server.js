@@ -59,5 +59,6 @@ console.log("✅ Student routes loaded");
 app.use('/api/teacher', require('./routes/teacherRoutes'));
 console.log("✅ Teacher routes loaded");
 
+app.use('/api/classes', require('./routes/classRoutes'));
 // ... រក្សាទុក
 });
