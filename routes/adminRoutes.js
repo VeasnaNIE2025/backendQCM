@@ -1,3 +1,4 @@
+// backend/routes/adminRoutes.js
 const express = require('express');
 const { protect, admin } = require('../middleware/authMiddleware');
 const {
@@ -12,7 +13,6 @@ const {
 const {
   getExams, getExamById, createExam, updateExam, deleteExam
 } = require('../controllers/examController');
-
 const {
   getStatistics,
   getExamResultsReport,
@@ -22,19 +22,19 @@ const {
   getTopStudents,
   getRecentActivities
 } = require('../controllers/reportController');
-
 const {
   exportExamResults,
   exportStudentPerformance,
   exportSubjectPerformance
 } = require('../controllers/exportController');
 
-
 const router = express.Router();
 
+// -----------------------------
+//  Cloudinary image upload (public)
+// -----------------------------
 const upload = require('../middleware/upload');
 
-// Upload image to Cloudinary
 router.post('/upload-image', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
@@ -42,7 +42,9 @@ router.post('/upload-image', upload.single('image'), (req, res) => {
   res.json({ imageUrl: req.file.path });
 });
 
-// All routes require authentication and admin role
+// -----------------------------
+//  All routes below require authentication + admin role
+// -----------------------------
 router.use(protect, admin);
 
 // User routes
@@ -73,6 +75,7 @@ router.post('/exams', createExam);
 router.put('/exams/:id', updateExam);
 router.delete('/exams/:id', deleteExam);
 
+// Report routes
 router.get('/reports/statistics', getStatistics);
 router.get('/reports/exam-results', getExamResultsReport);
 router.get('/reports/student-performance', getStudentPerformance);
@@ -81,7 +84,7 @@ router.get('/reports/exam-analytics', getExamAnalytics);
 router.get('/reports/top-students', getTopStudents);
 router.get('/reports/recent-activities', getRecentActivities);
 
-// Export routes
+// Export routes (Excel)
 router.get('/export/exam-results', exportExamResults);
 router.get('/export/student-performance', exportStudentPerformance);
 router.get('/export/subject-performance', exportSubjectPerformance);
