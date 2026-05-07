@@ -5,6 +5,9 @@ const Class = sequelize.define('Class', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING(100), allowNull: false, unique: true },
   description: { type: DataTypes.TEXT, allowNull: true }
-}, { timestamps: true, tableName: 'classes' });
+}, {
+  timestamps: false,   // ✅ fix: table មិនមាន createdAt/updatedAt
+  tableName: 'classes'
+});
 
 module.exports = Class;

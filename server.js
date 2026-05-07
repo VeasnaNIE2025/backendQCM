@@ -12,53 +12,36 @@ setupAssociations();
 
 const app = express();
 
-// CORS
-// app.use(cors({
-//   origin: ['https://online-qcm.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
-//   credentials: true
-// }));
+// ── CORS ──────────────────────────────────────────────
 app.use(cors({
   origin: [
-    'https://online-qcm.vercel.app',
-    'https://qcm.salacode.site', // ✅ បន្ថែមនេះ
     'http://localhost:5173',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://online-qcm.vercel.app',
+    'https://qcm.salacode.site',
+    /\.vercel\.app$/           // ✅ គ្រប់ Vercel preview URLs
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
+// ── Routes ────────────────────────────────────────────
+app.use('/api/auth',    require('./routes/authRoutes'));
+app.use('/api/admin',   require('./routes/adminRoutes'));
 app.use('/api/student', require('./routes/studentRoutes'));
 app.use('/api/teacher', require('./routes/teacherRoutes'));
+app.use('/api/classes', require('./routes/classRoutes'));  // ✅ ត្រូវដាក់នៅទីនេះ
 
-// Test Routes
+// ── Test ──────────────────────────────────────────────
 app.get('/api/test', (req, res) => res.json({ message: 'API is working!' }));
-app.get('/', (req, res) => res.json({ message: 'QCM Exam System API' }));
+app.get('/',         (req, res) => res.json({ message: 'QCM Exam System API' }));
 
+// ── Start ─────────────────────────────────────────────
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  // ... កូដខាងលើ
-
-console.log("🚀 Loading routes...");
-
-app.use('/api/auth', require('./routes/authRoutes'));
-console.log("✅ Auth routes loaded successfully");
-
-app.use('/api/admin', require('./routes/adminRoutes'));
-console.log("✅ Admin routes loaded");
-
-app.use('/api/student', require('./routes/studentRoutes'));
-console.log("✅ Student routes loaded");
-
-app.use('/api/teacher', require('./routes/teacherRoutes'));
-console.log("✅ Teacher routes loaded");
-
-app.use('/api/classes', require('./routes/classRoutes'));
-// ... រក្សាទុក
 });
