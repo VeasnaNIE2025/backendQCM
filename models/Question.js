@@ -46,6 +46,12 @@ const Question = sequelize.define('Question', {
   points: {
     type: DataTypes.INTEGER,
     defaultValue: 1
+  },
+  // ✅ បន្ថែមជួរឈរសម្រាប់រូបភាព
+  imageUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'URL of image for the question (optional)'
   }
 }, {
   timestamps: true,
