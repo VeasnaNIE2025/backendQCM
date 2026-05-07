@@ -35,11 +35,20 @@ const router = express.Router();
 // -----------------------------
 const upload = require('../middleware/upload');
 
-router.post('/upload-image', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
-  }
-  res.json({ imageUrl: req.file.path });
+router.post('/upload-image', (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('Multer/Cloudinary error:', err);
+      return res.status(500).json({ 
+        message: 'Upload failed', 
+        error: err.message 
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    res.json({ imageUrl: req.file.path });
+  });
 });
 
 // -----------------------------
