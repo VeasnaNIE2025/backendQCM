@@ -1,4 +1,5 @@
 const { sequelize } = require('../config/db');
+const User = require('../models/User'); // ✅ fix: User was not defined
 
 // ✅ Helper: Parse DB date string as UTC
 const parseUTC = (str) => {
@@ -12,7 +13,6 @@ const parseUTC = (str) => {
 const getAvailableExams = async (req, res) => {
   try {
     const studentId = req.user.id;
-    // Get student's classId
     const student = await User.findByPk(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found' });
     const classId = student.classId;
@@ -100,7 +100,6 @@ const getExamDetails = async (req, res) => {
 
     if (studentQuestions.length === 0) {
       if (isRandomMode) {
-        // Random mode: pick from exam_questions pool
         const availableQuestions = await sequelize.query(
           `SELECT q.* FROM exam_questions eq
            LEFT JOIN questions q ON eq.questionId = q.id
@@ -126,8 +125,6 @@ const getExamDetails = async (req, res) => {
 
         questions = availableQuestions.map(q => ({ ...q, points: 1 }));
       } else {
-        // ✅ FIX: Manual mode — insert into student_exam_questions ផង
-        // ដើម្បីឱ្យ submitExam រក questions បានត្រឹមត្រូវ
         const manualQuestions = await sequelize.query(
           `SELECT q.*, eq.\`order\`
            FROM exam_questions eq 
@@ -184,20 +181,15 @@ const submitExam = async (req, res) => {
     const examId = req.params.id;
     const studentId = req.user.id;
 
-    // ✅ FIX: Support both Array និង Object format សម្រាប់ answers
-    // Frontend (TakeExam.jsx) send: Object.values(answers) → Array ['a', 'b', ...]
-    // Backend ត្រូវការ: index-based access answers[i]
     let { answers } = req.body;
 
     console.log('========== SUBMIT EXAM ==========');
     console.log('ExamId:', examId, '| StudentId:', studentId);
     console.log('Answers raw:', answers, '| Type:', typeof answers);
 
-    // ✅ Normalize answers → Array ជានិច្ច
     if (!answers) {
       answers = [];
     } else if (!Array.isArray(answers)) {
-      // ប្រសិនបើ object {0: 'a', 1: 'b'} → convert to array
       const maxIdx = Math.max(...Object.keys(answers).map(Number));
       answers = Array.from({ length: maxIdx + 1 }, (_, i) => answers[i] || '');
     }
@@ -222,7 +214,6 @@ const submitExam = async (req, res) => {
     const examData = exam[0];
     const isRandomMode = examData.numberOfQuestions && examData.numberOfQuestions > 0;
 
-    // ✅ FIX: Check duplicate submit មុន insert
     const existingResult = await sequelize.query(
       `SELECT id FROM exam_results WHERE examId = :examId AND studentId = :studentId AND status = 'completed'`,
       {
@@ -235,7 +226,6 @@ const submitExam = async (req, res) => {
       return res.status(400).json({ message: 'អ្នកបានបញ្ជូនចម្លើយរួចហើយ' });
     }
 
-    // Get questions for this student (always from student_exam_questions)
     let questions = await sequelize.query(
       `SELECT q.id, q.points, q.correctAnswer, seq.\`order\`
        FROM student_exam_questions seq 
@@ -250,7 +240,6 @@ const submitExam = async (req, res) => {
 
     console.log('Questions from student_exam_questions:', questions.length);
 
-    // ✅ Fallback: exam_questions (សម្រាប់ exam ចាស់មុន fix)
     if (questions.length === 0) {
       questions = await sequelize.query(
         `SELECT q.id, q.points, q.correctAnswer, eq.\`order\`
@@ -274,13 +263,11 @@ const submitExam = async (req, res) => {
       questions = questions.map(q => ({ ...q, points: 1 }));
     }
 
-    // Calculate score
     let totalScore = 0;
     const studentAnswers = [];
 
     for (let i = 0; i < questions.length; i++) {
       const question = questions[i];
-      // ✅ FIX: Safe access — empty string ប្រសិនបើគ្មានចម្លើយ
       const userAnswer = (answers[i] || '').toString().toLowerCase().trim();
       const correctAnswer = (question.correctAnswer || '').toString().toLowerCase().trim();
       const isCorrect = userAnswer !== '' && userAnswer === correctAnswer;
@@ -300,7 +287,6 @@ const submitExam = async (req, res) => {
 
     console.log(`Score: ${totalScore}/${actualTotalPoints} = ${percentage.toFixed(2)}%`);
 
-    // Save result
     const result = await sequelize.query(
       `INSERT INTO exam_results (examId, studentId, totalScore, percentage, submittedAt, status, createdAt, updatedAt) 
        VALUES (:examId, :studentId, :totalScore, :percentage, NOW(), 'completed', NOW(), NOW())`,
@@ -313,7 +299,6 @@ const submitExam = async (req, res) => {
     const resultId = result[0];
     console.log('Result saved ID:', resultId);
 
-    // Save answers
     for (const answer of studentAnswers) {
       await sequelize.query(
         `INSERT INTO student_answers (resultId, questionId, selectedOption, isCorrect, pointsEarned, createdAt, updatedAt) 
