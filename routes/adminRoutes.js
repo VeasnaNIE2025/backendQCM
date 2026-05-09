@@ -49,28 +49,19 @@ router.post('/upload-image', (req, res, next) => {
   });
 });
 
-// router.post('/upload-image', (req, res, next) => {
-//   upload.single('image')(req, res, (err) => {
-//     if (err) {
-//       console.error('Multer/Cloudinary error:', err);
-//       return res.status(500).json({ 
-//         message: 'Upload failed', 
-//         error: err.message 
-//       });
-//     }
-//     if (!req.file) {
-//       return res.status(400).json({ message: 'No file uploaded' });
-//     }
-//     res.json({ imageUrl: req.file.path });
-//   });
-// });
+const {
+  getSubjectsByClass,
+  assignSubjectsToClass,
+  getAllClassesWithSubjects
+} = require('../controllers/classSubjectController');
 
-// -----------------------------
-//  All routes below require authentication + admin role
-// -----------------------------
 router.use(protect, admin);
 
-// User routes
+// ... ខាងក្នុង router (បន្ទាប់ពី `router.use(protect, admin)`)
+router.get('/classes-subjects', getAllClassesWithSubjects);
+router.get('/classes/:classId/subjects', getSubjectsByClass);
+router.put('/classes/:classId/subjects', assignSubjectsToClass);
+
 router.get('/users', getUsers);
 router.get('/users/:id', getUserById);
 router.post('/users', createUser);
@@ -111,5 +102,8 @@ router.get('/reports/recent-activities', getRecentActivities);
 router.get('/export/exam-results', exportExamResults);
 router.get('/export/student-performance', exportStudentPerformance);
 router.get('/export/subject-performance', exportSubjectPerformance);
+
+
+
 
 module.exports = router;

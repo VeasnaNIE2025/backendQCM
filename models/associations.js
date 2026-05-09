@@ -1,21 +1,29 @@
+
 // const Subject = require('./Subject');
 // const Question = require('./Question');
 // const Exam = require('./Exam');
 // const ExamQuestion = require('./ExamQuestion');
-// const ExamResult = require('./ExamResult');
-// const StudentAnswer = require('./StudentAnswer');
-// const User = require('./User');
+// const Class = require('./Class');       
+// const User = require('./User');          
+
+
 
 // const setupAssociations = () => {
+//   // ------------------------------
 //   // Subject - Question
+//   // ------------------------------
 //   Subject.hasMany(Question, { foreignKey: 'subjectId' });
 //   Question.belongsTo(Subject, { foreignKey: 'subjectId' });
   
+//   // ------------------------------
 //   // Subject - Exam
+//   // ------------------------------
 //   Subject.hasMany(Exam, { foreignKey: 'subjectId' });
 //   Exam.belongsTo(Subject, { foreignKey: 'subjectId' });
   
+//   // ------------------------------
 //   // Exam - Question (Many-to-Many)
+//   // ------------------------------
 //   Exam.belongsToMany(Question, { 
 //     through: ExamQuestion, 
 //     foreignKey: 'examId',
@@ -27,19 +35,13 @@
 //     otherKey: 'examId'
 //   });
   
-//   // Exam - ExamResult (One-to-Many)
-//   Exam.hasMany(ExamResult, { foreignKey: 'examId' });
-//   ExamResult.belongsTo(Exam, { foreignKey: 'examId' });
-  
-//   // User (Student) - ExamResult
-//   User.hasMany(ExamResult, { foreignKey: 'studentId' });
-//   ExamResult.belongsTo(User, { foreignKey: 'studentId' });
-  
-//   // ExamResult - StudentAnswer
-//   ExamResult.hasMany(StudentAnswer, { foreignKey: 'resultId' });
-//   StudentAnswer.belongsTo(ExamResult, { foreignKey: 'resultId' });
-  
-//   console.log('✅ All database associations established');
+//   // ------------------------------
+//   // ✅ Class - User (One-to-Many)
+//   // ------------------------------
+//   Class.hasMany(User, { foreignKey: 'classId' });
+//   User.belongsTo(Class, { foreignKey: 'classId' });
+
+//   console.log('✅ Database associations established (including Class-User)');
 // };
 
 // module.exports = setupAssociations;
@@ -48,57 +50,34 @@ const Subject = require('./Subject');
 const Question = require('./Question');
 const Exam = require('./Exam');
 const ExamQuestion = require('./ExamQuestion');
-const Class = require('./Class');        // ✅ បន្ថែម Class Model
-const User = require('./User');          // ✅ បន្ថែម User Model (ប្រសិនបើមិនទាន់មាន)
+const Class = require('./Class');
+const User = require('./User');
+const ClassSubject = require('./ClassSubject');
 
-// បើចង់ប្រើ ExamResult និង StudentAnswer ក្រោយ សូម uncomment
-// const ExamResult = require('./ExamResult');
-// const StudentAnswer = require('./StudentAnswer');
+
 
 const setupAssociations = () => {
-  // ------------------------------
   // Subject - Question
-  // ------------------------------
   Subject.hasMany(Question, { foreignKey: 'subjectId' });
   Question.belongsTo(Subject, { foreignKey: 'subjectId' });
   
-  // ------------------------------
   // Subject - Exam
-  // ------------------------------
   Subject.hasMany(Exam, { foreignKey: 'subjectId' });
   Exam.belongsTo(Subject, { foreignKey: 'subjectId' });
   
-  // ------------------------------
   // Exam - Question (Many-to-Many)
-  // ------------------------------
-  Exam.belongsToMany(Question, { 
-    through: ExamQuestion, 
-    foreignKey: 'examId',
-    otherKey: 'questionId'
-  });
-  Question.belongsToMany(Exam, { 
-    through: ExamQuestion, 
-    foreignKey: 'questionId',
-    otherKey: 'examId'
-  });
+  Exam.belongsToMany(Question, { through: ExamQuestion, foreignKey: 'examId', otherKey: 'questionId' });
+  Question.belongsToMany(Exam, { through: ExamQuestion, foreignKey: 'questionId', otherKey: 'examId' });
   
-  // ------------------------------
-  // ✅ Class - User (One-to-Many)
-  // ------------------------------
+  // Class - User
   Class.hasMany(User, { foreignKey: 'classId' });
   User.belongsTo(Class, { foreignKey: 'classId' });
   
-  // ------------------------------
-  // (ស្រេចចិត្ត) ប្រសិនបើចង់ប្រើ ExamResult និង StudentAnswer ក្រោយ
-  // ------------------------------
-  // Exam.hasMany(ExamResult, { foreignKey: 'examId' });
-  // ExamResult.belongsTo(Exam, { foreignKey: 'examId' });
-  // User.hasMany(ExamResult, { foreignKey: 'studentId' });
-  // ExamResult.belongsTo(User, { foreignKey: 'studentId' });
-  // ExamResult.hasMany(StudentAnswer, { foreignKey: 'resultId' });
-  // StudentAnswer.belongsTo(ExamResult, { foreignKey: 'resultId' });
+  // ✅ Class - Subject (Many-to-Many through ClassSubject)
+  Class.belongsToMany(Subject, { through: ClassSubject, foreignKey: 'classId', otherKey: 'subjectId' });
+  Subject.belongsToMany(Class, { through: ClassSubject, foreignKey: 'subjectId', otherKey: 'classId' });
   
-  console.log('✅ Database associations established (including Class-User)');
+  console.log('✅ All database associations established (including Class-Subject)');
 };
 
 module.exports = setupAssociations;

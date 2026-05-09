@@ -11,22 +11,29 @@ const parseUTC = (str) => {
 // Get available exams for student
 const getAvailableExams = async (req, res) => {
   try {
+    const studentId = req.user.id;
+    // Get student's classId
+    const student = await User.findByPk(studentId);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    const classId = student.classId;
+
     const now = new Date();
     const nowUTC = now.toISOString().slice(0, 19).replace('T', ' ');
 
     const exams = await sequelize.query(
       `SELECT e.*, s.name as subjectName 
        FROM exams e 
-       LEFT JOIN subjects s ON e.subjectId = s.id 
-       WHERE e.isActive = 1 
+       JOIN subjects s ON e.subjectId = s.id
+       JOIN class_subjects cs ON cs.subjectId = s.id
+       WHERE cs.classId = :classId
+       AND e.isActive = 1 
        AND e.endDate >= :now
        ORDER BY e.startDate ASC`,
       {
-        replacements: { now: nowUTC },
+        replacements: { classId, now: nowUTC },
         type: sequelize.QueryTypes.SELECT
       }
     );
-
     res.json(exams);
   } catch (error) {
     console.error('Error in getAvailableExams:', error);
