@@ -1,7 +1,9 @@
+
+
 // const { DataTypes } = require('sequelize');
 // const { sequelize } = require('../config/db');
 // const bcrypt = require('bcryptjs');
-
+// const User = require('../models/User');
 // const User = sequelize.define('User', {
 //   id: {
 //     type: DataTypes.INTEGER,
@@ -17,9 +19,7 @@
 //     type: DataTypes.STRING(100),
 //     allowNull: false,
 //     unique: true,
-//     validate: {
-//       isEmail: true
-//     }
+//     validate: { isEmail: true }
 //   },
 //   password: {
 //     type: DataTypes.STRING(255),
@@ -36,6 +36,12 @@
 //   isActive: {
 //     type: DataTypes.BOOLEAN,
 //     defaultValue: true
+//   },
+//   // ✅ បន្ថែម classId (ភ្ជាប់ទៅតារាង classes)
+//   classId: {
+//     type: DataTypes.INTEGER,
+//     allowNull: true,
+//     references: { model: 'classes', key: 'id' }
 //   }
 // }, {
 //   timestamps: true,
@@ -65,7 +71,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
+
 const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
@@ -99,7 +105,6 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: true
   },
-  // ✅ បន្ថែម classId (ភ្ជាប់ទៅតារាង classes)
   classId: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -123,7 +128,6 @@ User.beforeUpdate(async (user) => {
   }
 });
 
-// Compare password method
 User.prototype.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
