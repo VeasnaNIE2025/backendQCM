@@ -1,3 +1,4 @@
+// backend/models/ClassSubject.js
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
@@ -13,7 +14,7 @@ const ClassSubject = sequelize.define('ClassSubject', {
     primaryKey: true
   }
 }, {
-  timestamps: true,
+  timestamps: false,       // ✅ fix: table មិនមាន createdAt/updatedAt
   tableName: 'class_subjects'
 });
 
