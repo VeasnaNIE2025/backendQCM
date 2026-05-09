@@ -3,55 +3,42 @@ const { sequelize } = require('../config/db');
 // Get overall statistics
 const getStatistics = async (req, res) => {
   try {
-    // Total students
     const totalStudents = await sequelize.query(
       `SELECT COUNT(*) as count FROM users WHERE role = 'student'`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Total teachers
     const totalTeachers = await sequelize.query(
       `SELECT COUNT(*) as count FROM users WHERE role = 'teacher'`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Total subjects
     const totalSubjects = await sequelize.query(
       `SELECT COUNT(*) as count FROM subjects WHERE isActive = 1`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Total questions
     const totalQuestions = await sequelize.query(
       `SELECT COUNT(*) as count FROM questions`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Total exams
     const totalExams = await sequelize.query(
       `SELECT COUNT(*) as count FROM exams`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Total completed exams
     const totalCompletedExams = await sequelize.query(
       `SELECT COUNT(*) as count FROM exam_results WHERE status = 'completed'`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
-    // Average score across all exams
     const avgScore = await sequelize.query(
       `SELECT AVG(percentage) as average FROM exam_results WHERE status = 'completed'`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
+
     res.json({
-      totalStudents: totalStudents[0]?.count || 0,
-      totalTeachers: totalTeachers[0]?.count || 0,
-      totalSubjects: totalSubjects[0]?.count || 0,
-      totalQuestions: totalQuestions[0]?.count || 0,
-      totalExams: totalExams[0]?.count || 0,
-      totalCompletedExams: totalCompletedExams[0]?.count || 0,
+      totalStudents:      totalStudents[0]?.count      || 0,
+      totalTeachers:      totalTeachers[0]?.count      || 0,
+      totalSubjects:      totalSubjects[0]?.count      || 0,
+      totalQuestions:     totalQuestions[0]?.count     || 0,
+      totalExams:         totalExams[0]?.count         || 0,
+      totalCompletedExams:totalCompletedExams[0]?.count|| 0,
       averageScore: parseFloat(avgScore[0]?.average || 0).toFixed(2)
     });
   } catch (error) {
@@ -60,31 +47,34 @@ const getStatistics = async (req, res) => {
   }
 };
 
-// Get exam results report
+// Get exam results report ✅ + className
 const getExamResultsReport = async (req, res) => {
   try {
     const { examId } = req.query;
     let whereClause = '';
     let replacements = {};
-    
+
     if (examId) {
       whereClause = 'WHERE er.examId = :examId';
       replacements.examId = examId;
     }
-    
+
     const results = await sequelize.query(
-      `SELECT er.*, u.fullName as studentName, u.email as studentEmail, e.title as examTitle, e.totalPoints
+      `SELECT er.*,
+              u.fullName   as studentName,
+              u.email      as studentEmail,
+              c.name       as className,
+              e.title      as examTitle,
+              e.totalPoints
        FROM exam_results er
-       JOIN users u ON er.studentId = u.id
-       JOIN exams e ON er.examId = e.id
+       JOIN users u   ON er.studentId = u.id
+       LEFT JOIN classes c ON u.classId = c.id
+       JOIN exams e   ON er.examId = e.id
        ${whereClause}
        ORDER BY er.submittedAt DESC`,
-      {
-        replacements: replacements,
-        type: sequelize.QueryTypes.SELECT
-      }
+      { replacements, type: sequelize.QueryTypes.SELECT }
     );
-    
+
     res.json(results);
   } catch (error) {
     console.error('Error in getExamResultsReport:', error);
@@ -92,24 +82,25 @@ const getExamResultsReport = async (req, res) => {
   }
 };
 
-// Get student performance report
+// Get student performance ✅ + className
 const getStudentPerformance = async (req, res) => {
   try {
     const results = await sequelize.query(
-      `SELECT u.id, u.fullName, u.email, 
-              COUNT(er.id) as totalExamsTaken,
-              SUM(er.totalScore) as totalScore,
-              SUM(e.totalPoints) as totalPossible,
-              AVG(er.percentage) as averagePercentage
+      `SELECT u.id, u.fullName, u.email,
+              c.name              as className,
+              COUNT(er.id)        as totalExamsTaken,
+              SUM(er.totalScore)  as totalScore,
+              SUM(e.totalPoints)  as totalPossible,
+              AVG(er.percentage)  as averagePercentage
        FROM users u
+       LEFT JOIN classes c      ON u.classId = c.id
        LEFT JOIN exam_results er ON u.id = er.studentId AND er.status = 'completed'
-       LEFT JOIN exams e ON er.examId = e.id
+       LEFT JOIN exams e         ON er.examId = e.id
        WHERE u.role = 'student'
-       GROUP BY u.id, u.fullName, u.email
+       GROUP BY u.id, u.fullName, u.email, c.name
        ORDER BY averagePercentage DESC`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
     res.json(results);
   } catch (error) {
     console.error('Error in getStudentPerformance:', error);
@@ -122,17 +113,16 @@ const getSubjectPerformance = async (req, res) => {
   try {
     const results = await sequelize.query(
       `SELECT s.id, s.name as subjectName,
-              COUNT(DISTINCT er.id) as totalExams,
+              COUNT(DISTINCT er.id)        as totalExams,
               COUNT(DISTINCT er.studentId) as totalStudents,
-              AVG(er.percentage) as averageScore
+              AVG(er.percentage)           as averageScore
        FROM subjects s
-       LEFT JOIN exams e ON s.id = e.subjectId
+       LEFT JOIN exams e         ON s.id = e.subjectId
        LEFT JOIN exam_results er ON e.id = er.examId AND er.status = 'completed'
        GROUP BY s.id, s.name
        ORDER BY averageScore DESC`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
     res.json(results);
   } catch (error) {
     console.error('Error in getSubjectPerformance:', error);
@@ -140,7 +130,7 @@ const getSubjectPerformance = async (req, res) => {
   }
 };
 
-// Get exam analytics (pass rate, distribution)
+// Get exam analytics
 const getExamAnalytics = async (req, res) => {
   try {
     const analytics = await sequelize.query(
@@ -158,7 +148,6 @@ const getExamAnalytics = async (req, res) => {
        ORDER BY e.createdAt DESC`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
     res.json(analytics);
   } catch (error) {
     console.error('Error in getExamAnalytics:', error);
@@ -166,28 +155,25 @@ const getExamAnalytics = async (req, res) => {
   }
 };
 
-// Get top performing students
+// Get top students ✅ + className
 const getTopStudents = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
-    
     const results = await sequelize.query(
       `SELECT u.id, u.fullName, u.email,
-              COUNT(er.id) as examsTaken,
+              c.name             as className,
+              COUNT(er.id)       as examsTaken,
               AVG(er.percentage) as averageScore,
               MAX(er.percentage) as bestScore
        FROM users u
-       JOIN exam_results er ON u.id = er.studentId AND er.status = 'completed'
+       LEFT JOIN classes c       ON u.classId = c.id
+       JOIN exam_results er      ON u.id = er.studentId AND er.status = 'completed'
        WHERE u.role = 'student'
-       GROUP BY u.id, u.fullName, u.email
+       GROUP BY u.id, u.fullName, u.email, c.name
        ORDER BY averageScore DESC
        LIMIT :limit`,
-      {
-        replacements: { limit: parseInt(limit) },
-        type: sequelize.QueryTypes.SELECT
-      }
+      { replacements: { limit: parseInt(limit) }, type: sequelize.QueryTypes.SELECT }
     );
-    
     res.json(results);
   } catch (error) {
     console.error('Error in getTopStudents:', error);
@@ -199,19 +185,20 @@ const getTopStudents = async (req, res) => {
 const getRecentActivities = async (req, res) => {
   try {
     const activities = await sequelize.query(
-      `SELECT 'exam_completed' as type, er.id, u.fullName as studentName, e.title as examTitle, er.percentage, er.submittedAt as createdAt
+      `SELECT 'exam_completed' as type, er.id, u.fullName as studentName,
+              e.title as examTitle, er.percentage, er.submittedAt as createdAt
        FROM exam_results er
        JOIN users u ON er.studentId = u.id
        JOIN exams e ON er.examId = e.id
        WHERE er.status = 'completed'
        UNION ALL
-       SELECT 'exam_created' as type, e.id, NULL as studentName, e.title as examTitle, NULL as percentage, e.createdAt
+       SELECT 'exam_created' as type, e.id, NULL as studentName,
+              e.title as examTitle, NULL as percentage, e.createdAt
        FROM exams e
        ORDER BY createdAt DESC
        LIMIT 20`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
     res.json(activities);
   } catch (error) {
     console.error('Error in getRecentActivities:', error);
@@ -220,11 +207,6 @@ const getRecentActivities = async (req, res) => {
 };
 
 module.exports = {
-  getStatistics,
-  getExamResultsReport,
-  getStudentPerformance,
-  getSubjectPerformance,
-  getExamAnalytics,
-  getTopStudents,
-  getRecentActivities
+  getStatistics, getExamResultsReport, getStudentPerformance,
+  getSubjectPerformance, getExamAnalytics, getTopStudents, getRecentActivities
 };
