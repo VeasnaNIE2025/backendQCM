@@ -1,3 +1,5 @@
+// 
+
 const { sequelize } = require('../config/db');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
@@ -223,7 +225,7 @@ const exportExamResultPDF = async (req, res) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition',
-      `attachment; filename="result_${data.studentName}_${Date.now()}.pdf"`);
+      `attachment; filename="exam_result_${data.id}_${Date.now()}.pdf"`);
 
     doc.pipe(res);
 
