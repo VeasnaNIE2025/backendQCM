@@ -148,7 +148,8 @@ const {
 const {
   exportExamResults,
   exportStudentPerformance,
-  exportSubjectPerformance
+  exportSubjectPerformance,
+  exportExamResultPDF 
 } = require('../controllers/exportController');
 
 const {
@@ -156,6 +157,7 @@ const {
   assignSubjectsToClass,
   getAllClassesWithSubjects
 } = require('../controllers/classSubjectController');
+
 
 const upload = require('../middleware/upload');
 
@@ -225,5 +227,6 @@ router.get('/reports/recent-activities',   getRecentActivities);
 router.get('/export/exam-results',         exportExamResults);
 router.get('/export/student-performance',  exportStudentPerformance);
 router.get('/export/subject-performance',  exportSubjectPerformance);
+router.get('/export/result/:resultId/pdf', exportExamResultPDF);
 
 module.exports = router;
