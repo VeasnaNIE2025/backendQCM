@@ -387,7 +387,7 @@ const exportExamResultPDF = async (req, res) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.5);
     doc.font('Khmer').fontSize(10).fillColor('#888888')
-       .text('រៀបចំដោយ លោកគ្រូ ម៉ាន់ វាសនា', { align: 'center' })
+       .text('រៀបចំដោយ T.ម៉ាន់ វាសនា', { align: 'center' })
        .text(`ថ្ងៃទី: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
 
     doc.end();
