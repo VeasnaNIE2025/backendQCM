@@ -241,34 +241,59 @@ const exportExamResultPDF = async (req, res) => {
 
     doc.pipe(res);
 
-    // ── Header ──────────────────────────────────────────────
-    doc.font('Khmer-Bold').fontSize(16)
-       .text('QCM Examination System', { align: 'center' });
-    doc.font('Khmer').fontSize(12)
-       .text('របាយការណ៍លទ្ធផលប្រឡង', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    // ── Header (ទម្រង់ក្រសួង) ──────────────────────────────
+    const headerTopY = 50;
+
+    // ── ឆ្វេង: Logo + ឈ្មោះស្ថាប័ន ──
+    const logoPath = path.join(__dirname, '../assets/logo.png');
+    try {
+      doc.image(logoPath, 55, headerTopY, { width: 65 });
+    } catch {
+      // no logo — draw placeholder circle
+      doc.circle(87, headerTopY + 32, 30).stroke('#cccccc');
+    }
+    doc.font('Khmer').fontSize(10)
+       .text('វិចប.ព្រះនរោត្តមសីហមុនី', 50, headerTopY + 70, { width: 130, align: 'center' });
+
+    // ── ស្ដាំ: ព្រះរាជាណាចក្រ ──
+    doc.font('Khmer-Bold').fontSize(12)
+       .text('ព្រះរាជាណាចក្រកម្ពុជា', 320, headerTopY + 5, { width: 220, align: 'center' });
+    doc.font('Khmer').fontSize(11)
+       .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 320, headerTopY + 25, { width: 220, align: 'center' });
+    // underline
+    doc.moveTo(340, headerTopY + 48).lineTo(530, headerTopY + 48).lineWidth(1).stroke('#333');
+
+    // ── កណ្ដាល: Title ──
+    doc.font('Helvetica-Bold').fontSize(15)
+       .text('QCM Examination System', 50, headerTopY + 85, { width: 495, align: 'center' });
+    doc.font('Khmer-Bold').fontSize(13)
+       .text('របាយការណ៍លទ្ធផលប្រឡង', 50, headerTopY + 108, { width: 495, align: 'center' });
+
+    // ── Divider ──
+    doc.moveDown(0.3);
+    const divY = headerTopY + 132;
+    doc.moveTo(50, divY).lineTo(545, divY).lineWidth(1.5).stroke('#333333');
+    doc.y = divY + 10;
 
     // ── Student Info ─────────────────────────────────────────
     doc.font('Khmer').fontSize(11);
 
-    const info = [
-      ['ឈ្មោះសិស្ស',  data.studentName,  'ថ្នាក់',      data.className   || '—'],
-      ['អ៊ីមែល',      data.studentEmail, 'មុខវិជ្ជា',   data.subjectName       ],
-      ['ការប្រឡង',    data.examTitle,    'រយៈពេល',     `${data.duration} នាទី`],
-      ['ថ្ងៃប្រឡង',   new Date(data.submittedAt).toLocaleDateString('en-GB'), '', '']
-    ];
-
-    info.forEach(([lbl1, val1, lbl2, val2]) => {
+    const L = 50, R = 300; // left and right columns
+    const drawRow = (label1, val1, label2, val2) => {
       const y = doc.y;
-      doc.font('Khmer-Bold').text(`${lbl1}: `, 50, y, { continued: true, width: 60 });
-      doc.font('Khmer').text(val1 || '', { continued: !!lbl2, width: 200 });
-      if (lbl2) {
-        doc.font('Khmer-Bold').text(`  ${lbl2}: `, { continued: true });
-        doc.font('Khmer').text(val2 || '');
+      doc.font('Khmer-Bold').text(`${label1}:`, L, y, { width: 80, continued: false });
+      doc.font('Khmer').text(val1 || '—', L + 85, y, { width: 180 });
+      if (label2) {
+        doc.font('Khmer-Bold').text(`${label2}:`, R, y, { width: 80, continued: false });
+        doc.font('Khmer').text(val2 || '—', R + 85, y, { width: 160 });
       }
-    });
+      doc.moveDown(1.2);
+    };
+
+    drawRow('ឈ្មោះសិស្ស', data.studentName,  'ថ្នាក់',    data.className || '—');
+    drawRow('អ៊ីមែល',      data.studentEmail, 'មុខវិជ្ជា', data.subjectName);
+    drawRow('ការប្រឡង',    data.examTitle,    'រយៈពេល',   `${data.duration} នាទី`);
+    drawRow('ថ្ងៃប្រឡង',   new Date(data.submittedAt).toLocaleDateString('en-GB'), '', '');
 
     doc.moveDown(0.5);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
@@ -276,11 +301,15 @@ const exportExamResultPDF = async (req, res) => {
 
     // ── Score Box ────────────────────────────────────────────
     const pct    = parseFloat(data.percentage).toFixed(1);
-    const passed = parseFloat(pct) >= 70;
+    const pctNum = parseFloat(pct);
+    // ✅ ៣ កម្រិត — ជាប់ / មធ្យម / ធ្លាក់
+    const resultLabel = pctNum >= 70 ? 'ជាប់' : pctNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
+    const resultColor = pctNum >= 70 ? '#28a745' : pctNum >= 50 ? '#f39c12' : '#dc3545';
+    const boxBg       = pctNum >= 70 ? '#e8f5e9' : pctNum >= 50 ? '#fff8e1' : '#ffebee';
     const boxY   = doc.y;
 
     doc.rect(50, boxY, 495, 55)
-       .fillAndStroke(passed ? '#e8f5e9' : '#ffebee', passed ? '#28a745' : '#dc3545');
+       .fillAndStroke(boxBg, resultColor);
     doc.fillColor('black');
 
     doc.font('Khmer-Bold').fontSize(13)
@@ -290,7 +319,7 @@ const exportExamResultPDF = async (req, res) => {
        .text(`${pct}%`, 260, boxY + 8, { continued: true });
 
     doc.font('Khmer').fontSize(14)
-       .text(`  ${passed ? '>> ជាប់' : '>> ធ្លាក់'}`, { continued: false });
+       .text(`  >> ${resultLabel}`, { continued: false });
 
     doc.moveDown(3.5);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
@@ -339,10 +368,13 @@ const exportExamResultPDF = async (req, res) => {
       doc.text((ans.selectedOption || '—').toUpperCase(),    300, rowY + 5, { width: 55 });
       doc.text(ans.correctAnswer.toUpperCase(),              358, rowY + 5, { width: 60 });
 
-      // ✅ ជំនួស ✓/✗ ដោយ អក្សរខ្មែរ
-      doc.fillColor(isCorrect ? '#1a7a3a' : '#c0392b')
+      // ✅ ៣ កម្រិត
+      const rowResult = isCorrect ? 'ជាប់' : 'ធ្លាក់';
+      const rowColor  = isCorrect ? '#1a7a3a' : '#c0392b';
+
+      doc.fillColor(rowColor)
          .font('Khmer-Bold').fontSize(10)
-         .text(isCorrect ? 'ជាប់' : 'ធ្លាក់',               422, rowY + 5, { width: 55 });
+         .text(rowResult,                                       422, rowY + 5, { width: 55 });
 
       doc.fillColor('black').font('Khmer').fontSize(10)
          .text(`${ans.pointsEarned}/${ans.points}`,          480, rowY + 5, { width: 55 });
@@ -355,7 +387,7 @@ const exportExamResultPDF = async (req, res) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.5);
     doc.font('Khmer').fontSize(10).fillColor('#888888')
-       .text('បង្កើតដោយ QCM Examination System', { align: 'center' })
+       .text('រៀបចំដោយ លោកគ្រូ ម៉ាន់ វាសនា', { align: 'center' })
        .text(`ថ្ងៃទី: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
 
     doc.end();
