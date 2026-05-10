@@ -251,7 +251,7 @@ const exportExamResultPDF = async (req, res) => {
     doc.moveDown(0.5);
 
     // ── Student Info ─────────────────────────────────────────
-    doc.font('Khmer').fontSize(10);
+    doc.font('Khmer').fontSize(11);
 
     const info = [
       ['ឈ្មោះសិស្ស',  data.studentName,  'ថ្នាក់',      data.className   || '—'],
@@ -289,8 +289,8 @@ const exportExamResultPDF = async (req, res) => {
     doc.font('Khmer-Bold').fontSize(20)
        .text(`${pct}%`, 260, boxY + 8, { continued: true });
 
-    doc.font('Khmer').fontSize(12)
-       .text(`  ${passed ? '✓ ជាប់' : '✗ ធ្លាក់'}`, { continued: false });
+    doc.font('Khmer').fontSize(14)
+       .text(`  ${passed ? '>> ជាប់' : '>> ធ្លាក់'}`, { continued: false });
 
     doc.moveDown(3.5);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
@@ -303,57 +303,58 @@ const exportExamResultPDF = async (req, res) => {
 
     // Table header
     const thY = doc.y;
-    doc.rect(50, thY, 495, 20).fill('#4F81BD');
-    doc.fillColor('white').font('Khmer-Bold').fontSize(9);
+    doc.rect(50, thY, 495, 24).fill('#4F81BD');
+    doc.fillColor('white').font('Khmer-Bold').fontSize(11);
 
-    doc.text('ល.រ',       55,  thY + 5, { width: 25 });
-    doc.text('សំណួរ',      82,  thY + 5, { width: 220 });
-    doc.text('ចម្លើយ',     305, thY + 5, { width: 60 });
-    doc.text('ត្រឹមត្រូវ',  368, thY + 5, { width: 60 });
-    doc.text('លទ្ធផល',    430, thY + 5, { width: 50 });
-    doc.text('ពិន្ទុ',     482, thY + 5, { width: 55 });
+    doc.text('ល.រ',       55,  thY + 6, { width: 25 });
+    doc.text('សំណួរ',      82,  thY + 6, { width: 215 });
+    doc.text('ចម្លើយ',     300, thY + 6, { width: 55 });
+    doc.text('ត្រឹមត្រូវ',  358, thY + 6, { width: 60 });
+    doc.text('លទ្ធផល',    422, thY + 6, { width: 55 });
+    doc.text('ពិន្ទុ',     480, thY + 6, { width: 55 });
 
     doc.fillColor('black');
-    doc.moveDown(1.5);
+    doc.moveDown(1.8);
 
     // Rows
     answers.forEach((ans, i) => {
-      if (doc.y > 720) {
+      if (doc.y > 700) {
         doc.addPage();
         doc.moveDown(0.5);
       }
 
       const rowY      = doc.y;
       const isCorrect = ans.isCorrect === 1 || ans.isCorrect === true;
-      const bg        = i % 2 === 0 ? '#f5f5f5' : '#ffffff';
+      const bg        = i % 2 === 0 ? '#f0f4ff' : '#ffffff';
 
-      doc.rect(50, rowY, 495, 18).fill(bg);
-      doc.fillColor('black').font('Khmer').fontSize(8);
+      doc.rect(50, rowY, 495, 22).fill(bg);
+      doc.fillColor('black').font('Khmer').fontSize(10);
 
-      const qShort = (ans.questionText || '').length > 60
-        ? ans.questionText.substring(0, 57) + '...'
+      const qShort = (ans.questionText || '').length > 55
+        ? ans.questionText.substring(0, 52) + '...'
         : (ans.questionText || '');
 
-      doc.text(`${i + 1}`,                                  55,  rowY + 4, { width: 25 });
-      doc.text(qShort,                                       82,  rowY + 4, { width: 220 });
-      doc.text((ans.selectedOption || '—').toUpperCase(),    305, rowY + 4, { width: 60 });
-      doc.text(ans.correctAnswer.toUpperCase(),              368, rowY + 4, { width: 60 });
+      doc.text(`${i + 1}`,                                  55,  rowY + 5, { width: 25 });
+      doc.text(qShort,                                       82,  rowY + 5, { width: 215 });
+      doc.text((ans.selectedOption || '—').toUpperCase(),    300, rowY + 5, { width: 55 });
+      doc.text(ans.correctAnswer.toUpperCase(),              358, rowY + 5, { width: 60 });
 
-      doc.fillColor(isCorrect ? '#28a745' : '#dc3545')
-         .font('Khmer-Bold')
-         .text(isCorrect ? '✓' : '✗',                      430, rowY + 4, { width: 50 });
+      // ✅ ជំនួស ✓/✗ ដោយ អក្សរខ្មែរ
+      doc.fillColor(isCorrect ? '#1a7a3a' : '#c0392b')
+         .font('Khmer-Bold').fontSize(10)
+         .text(isCorrect ? 'ជាប់' : 'ធ្លាក់',               422, rowY + 5, { width: 55 });
 
-      doc.fillColor('black').font('Khmer')
-         .text(`${ans.pointsEarned}/${ans.points}`,          482, rowY + 4, { width: 55 });
+      doc.fillColor('black').font('Khmer').fontSize(10)
+         .text(`${ans.pointsEarned}/${ans.points}`,          480, rowY + 5, { width: 55 });
 
-      doc.moveDown(1.3);
+      doc.moveDown(1.6);
     });
 
     // ── Footer ───────────────────────────────────────────────
     doc.moveDown(1);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.5);
-    doc.font('Khmer').fontSize(8).fillColor('#888888')
+    doc.font('Khmer').fontSize(10).fillColor('#888888')
        .text('បង្កើតដោយ QCM Examination System', { align: 'center' })
        .text(`ថ្ងៃទី: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
 
