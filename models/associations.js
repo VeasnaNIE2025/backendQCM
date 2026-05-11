@@ -54,6 +54,9 @@ const Class = require('./Class');
 const User = require('./User');          // ✅ ត្រូវការ
 const ClassSubject = require('./ClassSubject');
 
+const Assignment = require('./Assignment');
+const Submission  = require('./Submission');
+
 const setupAssociations = () => {
   // Subject - Question
   Subject.hasMany(Question, { foreignKey: 'subjectId' });
@@ -74,6 +77,22 @@ const setupAssociations = () => {
   // Class - Subject (Many-to-Many)
   Class.belongsToMany(Subject, { through: ClassSubject, foreignKey: 'classId', otherKey: 'subjectId' });
   Subject.belongsToMany(Class, { through: ClassSubject, foreignKey: 'subjectId', otherKey: 'classId' });
+
+  // Assignment ↔ Subject
+  Assignment.belongsTo(Subject,     { foreignKey: 'subjectId' });
+  Subject.hasMany(Assignment,       { foreignKey: 'subjectId' });
+
+  // Assignment ↔ Teacher (User)
+  Assignment.belongsTo(User,        { foreignKey: 'createdBy', as: 'teacher' });
+  User.hasMany(Assignment,          { foreignKey: 'createdBy', as: 'createdAssignments' });
+
+  // Submission ↔ Assignment
+  Submission.belongsTo(Assignment,  { foreignKey: 'assignmentId' });
+  Assignment.hasMany(Submission,    { foreignKey: 'assignmentId' });
+
+  // Submission ↔ Student (User)
+  Submission.belongsTo(User,        { foreignKey: 'studentId', as: 'student' });
+  User.hasMany(Submission,          { foreignKey: 'studentId', as: 'submissions' });
   
   console.log('✅ All database associations established');
 };
