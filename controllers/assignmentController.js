@@ -13,7 +13,6 @@ const createAssignment = async (req, res) => {
     const { title, description, subjectId, dueDate, totalPoints } = req.body;
     const createdBy = req.user.id;
 
-    // စစ្សួរ subject មានឬទេ
     const subject = await Subject.findByPk(subjectId);
     if (!subject) {
       return res.status(404).json({ message: 'Subject រកមិនឃើញ!' });
@@ -37,20 +36,26 @@ const createAssignment = async (req, res) => {
   }
 };
 
-// ── 2. គ្រូទាញកិច្ចការតាម Subject ──────────────────────
-// backend/controllers/assignmentController.js
-// កែ getAssignmentsBySubject ឱ្យអាចទាញទាំងអស់បានផង
-
+// ── 2. គ្រូទាញកិច្ចការ (ទាំងអស់ ឬ តាម Subject) ──────────
 const getAssignmentsBySubject = async (req, res) => {
   try {
     const { subjectId } = req.params;
-    const whereClause = subjectId ? { subjectId } : {};  // ← ថែម
+    const whereClause = (subjectId && subjectId !== 'undefined')
+      ? { subjectId }
+      : {};                              // ← គ្មាន subjectId = ទាញទាំងអស់
 
     const assignments = await Assignment.findAll({
-      where: whereClause,                                 // ← ថែម
+      where: whereClause,
       include: [
-        { model: Subject, attributes: ['id', 'name'] },
-        { model: User, as: 'teacher', attributes: ['id', 'name', 'email'] }
+        {
+          model: Subject,
+          attributes: ['id', 'name']
+        },
+        {
+          model: User,
+          as: 'teacher',
+          attributes: ['id', 'fullName', 'email']  // ← fullName
+        }
       ],
       order: [['dueDate', 'ASC']]
     });
@@ -77,7 +82,7 @@ const getSubmissionsByAssignment = async (req, res) => {
         {
           model: User,
           as: 'student',
-          attributes: ['id', 'name', 'email']
+          attributes: ['id', 'fullName', 'email']  // ← fullName
         }
       ],
       order: [['submittedAt', 'DESC']]
@@ -107,7 +112,6 @@ const gradeSubmission = async (req, res) => {
       return res.status(404).json({ message: 'Submission រកមិនឃើញ!' });
     }
 
-    // စစ្សួរ grade មិនលើស totalPoints
     if (grade > submission.Assignment.totalPoints) {
       return res.status(400).json({
         message: `ពិន្ទុមិនអាចលើស ${submission.Assignment.totalPoints}!`
@@ -139,22 +143,28 @@ const getStudentAssignments = async (req, res) => {
   try {
     const studentId = req.user.id;
 
-    // ទាញ subjects ដែលសិស្សenrolled
     const student = await User.findByPk(studentId, {
       include: [{ model: Subject, as: 'subjects' }]
     });
+
+    if (!student || !student.subjects || student.subjects.length === 0) {
+      return res.json({ assignments: [] });
+    }
 
     const subjectIds = student.subjects.map(s => s.id);
 
     const assignments = await Assignment.findAll({
       where: { subjectId: subjectIds },
       include: [
-        { model: Subject, attributes: ['id', 'name'] },
+        {
+          model: Subject,
+          attributes: ['id', 'name']
+        },
         {
           model: Submission,
           where: { studentId },
-          required: false,        // LEFT JOIN — បង្ហាញទោះ submit ឬមិន submit
-          attributes: ['id', 'status', 'grade', 'submittedAt']
+          required: false,
+          attributes: ['id', 'status', 'grade', 'feedback', 'submittedAt']
         }
       ],
       order: [['dueDate', 'ASC']]
@@ -176,18 +186,15 @@ const submitAssignment = async (req, res) => {
       return res.status(400).json({ message: 'សូមភ្ជាប់ឯកសារ!' });
     }
 
-    // စစ្សួរ assignment មានឬទេ
     const assignment = await Assignment.findByPk(assignmentId);
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
     }
 
-    // សសួរ ថ្ងៃផុតកំណត់
     if (new Date() > new Date(assignment.dueDate)) {
       return res.status(400).json({ message: 'ផុតកំណត់ submit ហើយ!' });
     }
 
-    // សសួរ submit រួចហើយឬនៅ
     const existing = await Submission.findOne({ where: { assignmentId, studentId } });
     if (existing) {
       return res.status(400).json({ message: 'បានដាក់ស្នាដៃរួចហើយ!' });
@@ -196,7 +203,7 @@ const submitAssignment = async (req, res) => {
     const submission = await Submission.create({
       assignmentId,
       studentId,
-      fileUrl:  req.file.path,                  // Cloudinary URL
+      fileUrl:  req.file.path,
       fileName: req.file.originalname,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
@@ -239,12 +246,10 @@ const getMySubmissions = async (req, res) => {
 // EXPORTS
 // ═══════════════════════════════════════════════
 module.exports = {
-  // Teacher
   createAssignment,
   getAssignmentsBySubject,
   getSubmissionsByAssignment,
   gradeSubmission,
-  // Student
   getStudentAssignments,
   submitAssignment,
   getMySubmissions
