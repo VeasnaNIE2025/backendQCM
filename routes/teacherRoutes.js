@@ -70,4 +70,8 @@ router.get('/assignments/:subjectId',             getAssignmentsBySubject);
 router.get('/submissions/:assignmentId',          getSubmissionsByAssignment);
 router.put('/submissions/:submissionId/grade',    gradeSubmission);
 
+// បន្ថែមមួយបន្ទាត់នេះ
+router.get('/assignments',              getAssignmentsBySubject); // ← ទាញទាំងអស់
+router.get('/assignments/:subjectId',   getAssignmentsBySubject); // ← ទាញតាម subject
+
 module.exports = router;

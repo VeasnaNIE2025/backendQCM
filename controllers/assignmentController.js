@@ -38,12 +38,16 @@ const createAssignment = async (req, res) => {
 };
 
 // ── 2. គ្រូទាញកិច្ចការតាម Subject ──────────────────────
+// backend/controllers/assignmentController.js
+// កែ getAssignmentsBySubject ឱ្យអាចទាញទាំងអស់បានផង
+
 const getAssignmentsBySubject = async (req, res) => {
   try {
     const { subjectId } = req.params;
+    const whereClause = subjectId ? { subjectId } : {};  // ← ថែម
 
     const assignments = await Assignment.findAll({
-      where: { subjectId },
+      where: whereClause,                                 // ← ថែម
       include: [
         { model: Subject, attributes: ['id', 'name'] },
         { model: User, as: 'teacher', attributes: ['id', 'name', 'email'] }
