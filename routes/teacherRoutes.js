@@ -1,30 +1,3 @@
-// // 
-
-// const express = require('express');
-// const router = express.Router();
-// const { protect } = require('../middleware/authMiddleware');
-// const {
-//   getMySubjects,
-//   getMyStats,
-//   getMyQuestions,
-//   createMyQuestion,
-//   updateMyQuestion,
-//   deleteMyQuestion,
-//   getMyReports
-// } = require('../controllers/teacherController');
-
-// router.use(protect);
-
-// router.get('/subjects', getMySubjects);
-// router.get('/stats', getMyStats);
-// router.get('/questions', getMyQuestions);
-// router.post('/questions', createMyQuestion);
-// router.put('/questions/:id', updateMyQuestion);
-// router.delete('/questions/:id', deleteMyQuestion);
-// router.get('/reports', getMyReports);
-
-// module.exports = router;
-
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
@@ -39,43 +12,42 @@ const {
   updateMyQuestion,
   deleteMyQuestion,
   getMyReports,
-  getMyClasses          
+  getMyClasses
 } = require('../controllers/teacherController');
+
 // ── Controllers ថ្មី ─────────────────────────────────────
 const {
   createAssignment,
   getAssignmentsBySubject,
   getSubmissionsByAssignment,
-  gradeSubmission
+  gradeSubmission,
+  updateAssignment,
+  deleteAssignment
 } = require('../controllers/assignmentController');
 
 router.use(protect);
 
 // ════════════════════════════════════════════════
-// Routes ចាស់ (មិនផ្លាស់អ្វីសោះ)
+// Routes ចាស់
 // ════════════════════════════════════════════════
-router.get('/subjects',           getMySubjects);
-router.get('/stats',              getMyStats);
-router.get('/questions',          getMyQuestions);
-router.post('/questions',         upload.single('image'), createMyQuestion);
-router.put('/questions/:id',      upload.single('image'), updateMyQuestion);
-router.delete('/questions/:id',   deleteMyQuestion);
-router.get('/reports',            getMyReports);
+router.get('/subjects',                         getMySubjects);
+router.get('/stats',                            getMyStats);
+router.get('/questions',                        getMyQuestions);
+router.post('/questions',                       upload.single('image'), createMyQuestion);
+router.put('/questions/:id',                    upload.single('image'), updateMyQuestion);
+router.delete('/questions/:id',                 deleteMyQuestion);
+router.get('/reports',                          getMyReports);
+router.get('/classes',                          getMyClasses);
 
 // ════════════════════════════════════════════════
 // Routes ថ្មី — Assignment
 // ════════════════════════════════════════════════
-router.post('/assignments',                       upload.none(), createAssignment);
-router.get('/assignments/:subjectId',             getAssignmentsBySubject);
-router.get('/submissions/:assignmentId',          getSubmissionsByAssignment);
-router.put('/submissions/:submissionId/grade',    gradeSubmission);
-
-// បន្ថែមមួយបន្ទាត់នេះ
-router.get('/assignments',              getAssignmentsBySubject); // ← ទាញទាំងអស់
-router.get('/assignments/:subjectId',   getAssignmentsBySubject); // ← ទាញតាម subject
-// teacherRoutes.js — បន្ថែម
-router.get('/classes', getMyClasses);
-router.put('/assignments/:id',    updateAssignment);
-router.delete('/assignments/:id', deleteAssignment);
+router.get('/assignments',                      getAssignmentsBySubject);
+router.post('/assignments',                     upload.none(), createAssignment);
+router.put('/assignments/:id',                  updateAssignment);
+router.delete('/assignments/:id',               deleteAssignment);
+router.get('/assignments/:subjectId',           getAssignmentsBySubject);
+router.get('/submissions/:assignmentId',        getSubmissionsByAssignment);
+router.put('/submissions/:submissionId/grade',  gradeSubmission);
 
 module.exports = router;
