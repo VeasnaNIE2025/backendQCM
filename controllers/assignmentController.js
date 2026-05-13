@@ -3,70 +3,7 @@ const Submission = require('../models/Submission');
 const Subject    = require('../models/Subject');
 const User       = require('../models/User');
 
-// ═══════════════════════════════════════════════
-// TEACHER FUNCTIONS
-// ═══════════════════════════════════════════════
 
-// ── 1. គ្រូបង្កើតកិច្ចការ ────────────────────────────────
-// const createAssignment = async (req, res) => {
-//   try {
-//     const { title, description, subjectId, dueDate, totalPoints } = req.body;
-//     const createdBy = req.user.id;
-
-//     const subject = await Subject.findByPk(subjectId);
-//     if (!subject) {
-//       return res.status(404).json({ message: 'Subject រកមិនឃើញ!' });
-//     }
-
-//     const assignment = await Assignment.create({
-//       title,
-//       description,
-//       subjectId,
-//       dueDate,
-//       totalPoints: totalPoints || 100,
-//       createdBy
-//     });
-
-//     res.status(201).json({
-//       message: 'បង្កើតកិច្ចការដោយជោគជ័យ!',
-//       assignment
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// };
-
-// // ── 2. គ្រូទាញកិច្ចការ (ទាំងអស់ ឬ តាម Subject) ──────────
-// const getAssignmentsBySubject = async (req, res) => {
-//   try {
-//     const { subjectId } = req.params;
-//     const whereClause = (subjectId && subjectId !== 'undefined')
-//       ? { subjectId }
-//       : {};                              // ← គ្មាន subjectId = ទាញទាំងអស់
-
-//     const assignments = await Assignment.findAll({
-//       where: whereClause,
-//       include: [
-//         {
-//           model: Subject,
-//           attributes: ['id', 'name']
-//         },
-//         {
-//           model: User,
-//           as: 'teacher',
-//           attributes: ['id', 'fullName', 'email']  // ← fullName
-//         }
-//       ],
-//       order: [['dueDate', 'ASC']]
-//     });
-
-//     res.json({ assignments });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// };
-
-// assignmentController.js
 
 // ── createAssignment ── បន្ថែម classId
 const createAssignment = async (req, res) => {
@@ -96,7 +33,7 @@ const getAssignmentsBySubject = async (req, res) => {
       where: whereClause,
       include: [
         { model: Subject, attributes: ['id', 'name'] },
-        { model: Class,   attributes: ['id', 'name'] },  // ← បន្ថែម
+        // { model: Class, attributes: ['id', 'name'] },  // ← comment out ជាមុន
         { model: User, as: 'teacher', attributes: ['id', 'fullName', 'email'] }
       ],
       order: [['dueDate', 'ASC']]
@@ -104,6 +41,7 @@ const getAssignmentsBySubject = async (req, res) => {
 
     res.json({ assignments });
   } catch (error) {
+    console.error('Assignment error:', error.message);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
