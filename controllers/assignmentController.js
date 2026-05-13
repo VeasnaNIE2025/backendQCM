@@ -158,6 +158,7 @@ const getStudentAssignments = async (req, res) => {
   }
 };
 
+
 // ── Update Assignment ─────────────────────────
 const updateAssignment = async (req, res) => {
   try {
@@ -169,8 +170,8 @@ const updateAssignment = async (req, res) => {
       return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
     }
 
-    // စစ្សួរ ត្រឹមតែគ្រូម្ចាស់ប៉ុណ្ណោះ
-    if (assignment.createdBy !== req.user.id) {
+    // ← parseInt ដើម្បីប្រៀបធៀប type ត្រឹមត្រូវ
+    if (parseInt(assignment.createdBy) !== parseInt(req.user.id)) {
       return res.status(403).json({ message: 'មិនមានសិទ្ធិកែប្រែ!' });
     }
 
@@ -195,7 +196,8 @@ const deleteAssignment = async (req, res) => {
       return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
     }
 
-    if (assignment.createdBy !== req.user.id) {
+    // ← parseInt ដូចគ្នា
+    if (parseInt(assignment.createdBy) !== parseInt(req.user.id)) {
       return res.status(403).json({ message: 'មិនមានសិទ្ធិលុប!' });
     }
 
@@ -205,6 +207,7 @@ const deleteAssignment = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // ── 6. សិស្សដាក់ស្នាដៃ (Upload File) ─────────────────────
 const submitAssignment = async (req, res) => {
