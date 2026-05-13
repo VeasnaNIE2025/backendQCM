@@ -126,18 +126,19 @@ const getStudentAssignments = async (req, res) => {
   try {
     const studentId = req.user.id;
 
-    const student = await User.findByPk(studentId, {
-      include: [{ model: Subject, as: 'subjects' }]
-    });
-
-    if (!student || !student.subjects || student.subjects.length === 0) {
-      return res.json({ assignments: [] });
+    // ទាញ classId របស់សិស្ស
+    const student = await User.findByPk(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'សិស្សរកមិនឃើញ!' });
     }
 
-    const subjectIds = student.subjects.map(s => s.id);
+    // ទាញ assignments តាម classId របស់សិស្ស
+    const whereClause = student.classId
+      ? { classId: student.classId }
+      : {};
 
     const assignments = await Assignment.findAll({
-      where: { subjectId: subjectIds },
+      where: whereClause,
       include: [
         { model: Subject, attributes: ['id', 'name'] },
         {
@@ -152,6 +153,7 @@ const getStudentAssignments = async (req, res) => {
 
     res.json({ assignments });
   } catch (error) {
+    console.error('getStudentAssignments error:', error.message);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
