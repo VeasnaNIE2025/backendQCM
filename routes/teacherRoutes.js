@@ -75,5 +75,7 @@ router.get('/assignments',              getAssignmentsBySubject); // ← ទា�
 router.get('/assignments/:subjectId',   getAssignmentsBySubject); // ← ទាញតាម subject
 // teacherRoutes.js — បន្ថែម
 router.get('/classes', getMyClasses);
+router.put('/assignments/:id',    updateAssignment);
+router.delete('/assignments/:id', deleteAssignment);
 
 module.exports = router;

@@ -158,6 +158,54 @@ const getStudentAssignments = async (req, res) => {
   }
 };
 
+// ── Update Assignment ─────────────────────────
+const updateAssignment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, subjectId, classId, dueDate, totalPoints } = req.body;
+
+    const assignment = await Assignment.findByPk(id);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
+    }
+
+    // စစ្សួរ ត្រឹមតែគ្រូម្ចាស់ប៉ុណ្ណោះ
+    if (assignment.createdBy !== req.user.id) {
+      return res.status(403).json({ message: 'មិនមានសិទ្ធិកែប្រែ!' });
+    }
+
+    await assignment.update({
+      title, description, subjectId,
+      classId, dueDate, totalPoints
+    });
+
+    res.json({ message: 'កែប្រែដោយជោគជ័យ!', assignment });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// ── Delete Assignment ─────────────────────────
+const deleteAssignment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const assignment = await Assignment.findByPk(id);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
+    }
+
+    if (assignment.createdBy !== req.user.id) {
+      return res.status(403).json({ message: 'មិនមានសិទ្ធិលុប!' });
+    }
+
+    await assignment.destroy();
+    res.json({ message: 'លុបដោយជោគជ័យ!' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // ── 6. សិស្សដាក់ស្នាដៃ (Upload File) ─────────────────────
 const submitAssignment = async (req, res) => {
   try {
@@ -230,5 +278,7 @@ module.exports = {
   gradeSubmission,
   getStudentAssignments,
   submitAssignment,
-  getMySubmissions
+  getMySubmissions,
+  updateAssignment,   
+  deleteAssignment  
 };
