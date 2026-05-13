@@ -3,17 +3,18 @@ const Submission = require('../models/Submission');
 const Subject    = require('../models/Subject');
 const User       = require('../models/User');
 
+// ═══════════════════════════════════════════════
+// TEACHER FUNCTIONS
+// ═══════════════════════════════════════════════
 
-
-// ── createAssignment ── បន្ថែម classId
+// ── 1. គ្រូបង្កើតកិច្ចការ ────────────────────────────────
 const createAssignment = async (req, res) => {
   try {
     const { title, description, subjectId, classId, dueDate, totalPoints } = req.body;
     const createdBy = req.user.id;
 
     const assignment = await Assignment.create({
-      title, description, subjectId,
-      classId,                          // ← បន្ថែម
+      title, description, subjectId, classId,
       dueDate, totalPoints: totalPoints || 100, createdBy
     });
 
@@ -23,7 +24,29 @@ const createAssignment = async (req, res) => {
   }
 };
 
-// ── getAssignmentsBySubject ── បន្ថែម Class include
+// ── 2. គ្រូទាញកិច្ចការ ───────────────────────────────────
+const getAssignmentsBySubject = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const whereClause = (subjectId && subjectId !== 'undefined') ? { subjectId } : {};
+
+    const assignments = await Assignment.findAll({
+      where: whereClause,
+      include: [
+        { model: Subject, attributes: ['id', 'name'] },
+        { model: User, as: 'teacher', attributes: ['id', 'fullName', 'email'] }
+      ],
+      order: [['dueDate', 'ASC']]
+    });
+
+    res.json({ assignments });
+  } catch (error) {
+    console.error('getAssignmentsBySubject error:', error.message);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// ── 3. គ្រូមើល Submissions ទាំងអស់របស់ Assignment ────────
 const getSubmissionsByAssignment = async (req, res) => {
   try {
     const { assignmentId } = req.params;
@@ -57,38 +80,7 @@ const getSubmissionsByAssignment = async (req, res) => {
       submissions
     });
   } catch (error) {
-    console.error('Submissions error:', error.message);  // ← log error
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-// ── 3. គ្រូមើល Submissions ទាំងអស់របស់ Assignment ────────
-const getSubmissionsByAssignment = async (req, res) => {
-  try {
-    const { assignmentId } = req.params;
-
-    const assignment = await Assignment.findByPk(assignmentId);
-    if (!assignment) {
-      return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
-    }
-
-    const submissions = await Submission.findAll({
-      where: { assignmentId },
-      include: [
-        {
-          model: User,
-          as: 'student',
-          attributes: ['id', 'fullName', 'email']  // ← fullName
-        }
-      ],
-      order: [['submittedAt', 'DESC']]
-    });
-
-    res.json({
-      assignment,
-      totalSubmissions: submissions.length,
-      submissions
-    });
-  } catch (error) {
+    console.error('getSubmissionsByAssignment error:', error.message);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -114,16 +106,12 @@ const gradeSubmission = async (req, res) => {
     }
 
     await submission.update({
-      grade,
-      feedback,
+      grade, feedback,
       gradedAt: new Date(),
       status: 'graded'
     });
 
-    res.json({
-      message: 'ដាក់ពិន្ទុដោយជោគជ័យ!',
-      submission
-    });
+    res.json({ message: 'ដាក់ពិន្ទុដោយជោគជ័យ!', submission });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -151,10 +139,7 @@ const getStudentAssignments = async (req, res) => {
     const assignments = await Assignment.findAll({
       where: { subjectId: subjectIds },
       include: [
-        {
-          model: Subject,
-          attributes: ['id', 'name']
-        },
+        { model: Subject, attributes: ['id', 'name'] },
         {
           model: Submission,
           where: { studentId },
@@ -196,8 +181,7 @@ const submitAssignment = async (req, res) => {
     }
 
     const submission = await Submission.create({
-      assignmentId,
-      studentId,
+      assignmentId, studentId,
       fileUrl:  req.file.path,
       fileName: req.file.originalname,
       fileType: req.file.mimetype,
@@ -205,10 +189,7 @@ const submitAssignment = async (req, res) => {
       submittedAt: new Date()
     });
 
-    res.status(201).json({
-      message: 'ដាក់ស្នាដៃដោយជោគជ័យ!',
-      submission
-    });
+    res.status(201).json({ message: 'ដាក់ស្នាដៃដោយជោគជ័យ!', submission });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
