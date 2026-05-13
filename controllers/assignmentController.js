@@ -24,29 +24,43 @@ const createAssignment = async (req, res) => {
 };
 
 // ── getAssignmentsBySubject ── បន្ថែម Class include
-const getAssignmentsBySubject = async (req, res) => {
+const getSubmissionsByAssignment = async (req, res) => {
   try {
-    const { subjectId } = req.params;
-    const whereClause = (subjectId && subjectId !== 'undefined') ? { subjectId } : {};
+    const { assignmentId } = req.params;
 
-    const assignments = await Assignment.findAll({
-      where: whereClause,
+    const assignment = await Assignment.findByPk(assignmentId, {
       include: [
         { model: Subject, attributes: ['id', 'name'] },
-        // { model: Class, attributes: ['id', 'name'] },  // ← comment out ជាមុន
         { model: User, as: 'teacher', attributes: ['id', 'fullName', 'email'] }
-      ],
-      order: [['dueDate', 'ASC']]
+      ]
     });
 
-    res.json({ assignments });
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment រកមិនឃើញ!' });
+    }
+
+    const submissions = await Submission.findAll({
+      where: { assignmentId },
+      include: [
+        {
+          model: User,
+          as: 'student',
+          attributes: ['id', 'fullName', 'email']
+        }
+      ],
+      order: [['submittedAt', 'DESC']]
+    });
+
+    res.json({
+      assignment,
+      totalSubmissions: submissions.length,
+      submissions
+    });
   } catch (error) {
-    console.error('Assignment error:', error.message);
+    console.error('Submissions error:', error.message);  // ← log error
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
 // ── 3. គ្រូមើល Submissions ទាំងអស់របស់ Assignment ────────
 const getSubmissionsByAssignment = async (req, res) => {
   try {
