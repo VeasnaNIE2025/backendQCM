@@ -625,14 +625,18 @@ const exportSubjectPerformance = async (req, res) => {
 };
 
 // ── Export Single Exam Result as Modern PDF ───────────────────
+// ── Export Single Exam Result as Modern PDF ───────────────────
 const exportExamResultPDF = async (req, res) => {
   try {
     const { resultId } = req.params;
 
-    const result = await sequelize.query(
-      `SELECT er.*, u.fullName as studentName, u.email as studentEmail,
-              c.name as className, e.title as examTitle, e.totalPoints, 
-              e.duration, s.name as subjectName
+    // 1. Fetch Data
+    const resultQuery = await sequelize.query(
+      `SELECT er.*, 
+              u.fullName as studentName, u.email as studentEmail, 
+              c.name as className, 
+              e.title as examTitle, e.totalPoints, e.duration,
+              s.name as subjectName
        FROM exam_results er
        JOIN users u ON er.studentId = u.id
        LEFT JOIN classes c ON u.classId = c.id
@@ -642,16 +646,16 @@ const exportExamResultPDF = async (req, res) => {
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    if (!result || result.length === 0) {
+    if (!resultQuery || resultQuery.length === 0) {
       return res.status(404).json({ message: 'Result not found' });
     }
 
-    const data = result[0];
+    const data = resultQuery[0];
 
+    // 2. Fetch Answers
     const answers = await sequelize.query(
       `SELECT sa.selectedOption, sa.isCorrect, sa.pointsEarned,
-              q.questionText, q.correctAnswer, q.points,
-              q.option_a, q.option_b, q.option_c, q.option_d
+              q.questionText, q.correctAnswer, q.points
        FROM student_answers sa
        JOIN questions q ON sa.questionId = q.id
        WHERE sa.resultId = :resultId
@@ -659,118 +663,139 @@ const exportExamResultPDF = async (req, res) => {
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ 
+      margin: 50, 
+      size: 'A4',
+      bufferPages: true 
+    });
 
-    doc.registerFont('Khmer', FONT);
-    doc.registerFont('Khmer-Bold', FONT_BOLD);
+    // Register Fonts with better error handling
+    try {
+      doc.registerFont('Khmer', FONT);
+      doc.registerFont('Khmer-Bold', FONT_BOLD);
+    } catch (fontErr) {
+      console.error('Font registration failed:', fontErr);
+      // Fallback to Helvetica if Khmer font fails
+      console.warn('Using Helvetica as fallback font');
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="លទ្ធផល_${data.studentName}_${Date.now()}.pdf"`);
+    res.setHeader('Content-Disposition', 
+      `attachment; filename="លទ្ធផល_${(data.studentName || 'student').replace(/[^a-zA-Z0-9]/g, '')}_${Date.now()}.pdf"`);
 
     doc.pipe(res);
 
-    // Header
-    const headerY = 45;
-    const logoPath = path.join(__dirname, '../assets/logo.png');
+    let y = 45;
 
+    // ====================== HEADER ======================
+    const logoPath = path.join(__dirname, '../assets/logo.png');
     try {
-      doc.image(logoPath, 50, headerY, { width: 70 });
+      doc.image(logoPath, 50, y, { width: 70 });
     } catch (e) {
-      doc.rect(50, headerY, 70, 70).fill('#f1f5f9').stroke();
+      console.warn('Logo not found, using placeholder');
+      doc.rect(50, y, 70, 70).fill('#f1f5f9').stroke('#cbd5e1');
     }
 
     doc.font('Khmer-Bold').fontSize(14)
        .fillColor('#1e3a8a')
-       .text('ព្រះរាជាណាចក្រកម្ពុជា', 380, headerY + 12, { align: 'center', width: 180 });
+       .text('ព្រះរាជាណាចក្រកម្ពុជា', 370, y + 15, { align: 'center', width: 190 });
 
     doc.font('Khmer').fontSize(11)
        .fillColor('#334155')
-       .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 380, headerY + 34, { align: 'center', width: 180 });
+       .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 370, y + 37, { align: 'center', width: 190 });
 
     doc.font('Khmer-Bold').fontSize(18)
        .fillColor('#1e40af')
-       .text('របាយការណ៍លទ្ធផលប្រឡង', 0, headerY + 78, { align: 'center', width: doc.page.width });
+       .text('របាយការណ៍លទ្ធផលប្រឡង', 0, y + 80, { align: 'center', width: doc.page.width });
 
-    doc.moveTo(50, headerY + 118)
-       .lineTo(545, headerY + 118)
+    // Blue Line
+    doc.moveTo(50, y + 118)
+       .lineTo(545, y + 118)
        .lineWidth(3)
        .strokeColor('#3b82f6')
        .stroke();
 
-    doc.y = headerY + 140;
+    y = y + 145;
+    doc.y = y;
 
-    // Student Information
+    // ====================== STUDENT INFO ======================
     doc.font('Khmer').fontSize(11).fillColor('#1f2937');
 
-    const drawInfo = (label, value, label2 = '', value2 = '') => {
-      const y = doc.y;
-      doc.font('Khmer-Bold').text(label + ': ', 50, y, { width: 95 });
-      doc.font('Khmer').text(value || '—', 145, y);
+    const drawInfo = (label, value, label2 = null, value2 = null) => {
+      const currentY = doc.y;
+      doc.font('Khmer-Bold').text(`${label}: `, 50, currentY, { width: 100, continued: false });
+      doc.font('Khmer').text(value || '—', 155, currentY);
 
       if (label2) {
-        doc.font('Khmer-Bold').text(label2 + ': ', 320, y, { width: 85 });
-        doc.font('Khmer').text(value2 || '—', 405, y);
+        doc.font('Khmer-Bold').text(`${label2}: `, 340, currentY, { width: 90 });
+        doc.font('Khmer').text(value2 || '—', 430, currentY);
       }
-      doc.moveDown(1.4);
+      doc.moveDown(1.35);
     };
 
-    drawInfo('ឈ្មោះសិស្ស', data.studentName, 'ថ្នាក់', data.className || '—');
+    drawInfo('ឈ្មោះសិស្ស', data.studentName, 'ថ្នាក់', data.className);
     drawInfo('អ៊ីមែល', data.studentEmail, 'មុខវិជ្ជា', data.subjectName);
-    drawInfo('ការប្រឡង', data.examTitle, 'ថ្ងៃប្រឡង', new Date(data.submittedAt).toLocaleDateString('km-KH'));
+    drawInfo('ការប្រឡង', data.examTitle);
+    drawInfo('ថ្ងៃប្រឡង', new Date(data.submittedAt).toLocaleDateString('km-KH'));
 
-    doc.moveDown(1);
+    doc.moveDown(1.5);
 
-    // Score Card
-    const percentage = parseFloat(data.percentage).toFixed(1);
+    // ====================== SCORE CARD ======================
+    const percentage = parseFloat(data.percentage || 0).toFixed(1);
     const scoreNum = parseFloat(percentage);
     const status = scoreNum >= 70 ? 'ជាប់' : scoreNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
-    const color = scoreNum >= 70 ? '#22c55e' : scoreNum >= 50 ? '#eab308' : '#ef4444';
+    const statusColor = scoreNum >= 70 ? '#22c55e' : scoreNum >= 50 ? '#eab308' : '#ef4444';
 
     const cardY = doc.y;
-    doc.rect(50, cardY, 495, 95).fillAndStroke('#f8fafc', '#e2e8f0');
 
-    // Circle
-    doc.circle(115, cardY + 47, 38).fill('#ffffff').stroke(color, 10);
+    doc.rect(50, cardY, 495, 98).fillAndStroke('#f8fafc', '#e2e8f0');
+
+    // Percentage Circle
+    doc.circle(118, cardY + 48, 39)
+       .fill('#ffffff')
+       .stroke(statusColor, 9);
+
     doc.font('Khmer-Bold').fontSize(29)
-       .fillColor(color)
-       .text(percentage + '%', 82, cardY + 30, { width: 65, align: 'center' });
+       .fillColor(statusColor)
+       .text(`${percentage}%`, 85, cardY + 31, { width: 66, align: 'center' });
 
-    doc.font('Khmer-Bold').fontSize(23)
+    // Score
+    doc.font('Khmer-Bold').fontSize(24)
        .fillColor('#1e2937')
-       .text(`${data.totalScore} / ${data.totalPoints}`, 190, cardY + 28);
+       .text(`${data.totalScore || 0} / ${data.totalPoints || 0}`, 195, cardY + 32);
 
     doc.font('Khmer').fontSize(13)
        .fillColor('#64748b')
-       .text('ពិន្ទុសរុប', 190, cardY + 55);
+       .text('ពិន្ទុសរុប', 195, cardY + 60);
 
-    // Status Badge
-    doc.rect(380, cardY + 28, 145, 48)
-       .fill(color)
-       .rounded(10);
+    // Status Box
+    doc.rect(385, cardY + 30, 145, 50)
+       .fill(statusColor)
+       .rounded(8);
 
     doc.fillColor('#ffffff')
        .font('Khmer-Bold')
        .fontSize(19)
-       .text(status, 390, cardY + 38, { width: 125, align: 'center' });
+       .text(status, 395, cardY + 39, { width: 125, align: 'center' });
 
-    doc.moveDown(7);
+    doc.moveDown(7.5);
 
-    // Detailed Answers Table
-    doc.font('Khmer-Bold').fontSize(13).fillColor('#1e40af')
+    // ====================== TABLE ======================
+    doc.font('Khmer-Bold').fontSize(13)
+       .fillColor('#1e40af')
        .text('លទ្ធផលលម្អិត');
 
-    doc.moveDown(0.5);
+    doc.moveDown(0.6);
 
     const thY = doc.y;
-    doc.rect(50, thY, 495, 28).fill('#1e40af');
+    doc.rect(50, thY, 495, 29).fill('#1e40af');
+
     doc.fillColor('#ffffff').font('Khmer-Bold').fontSize(10.5);
-
-    const colX = [55, 85, 305, 375, 445, 490];
-    const headers = ['ល.រ', 'សំណួរ', 'ចម្លើយសិស្ស', 'ចម្លើយត្រឹមត្រូវ', 'លទ្ធផល', 'ពិន្ទុ'];
-
-    headers.forEach((text, i) => {
-      doc.text(text, colX[i], thY + 9, { width: i === 1 ? 210 : 80 });
-    });
+    const cols = [55, 88, 310, 380, 450, 495];
+    ['ល.រ', 'សំណួរ', 'ចម្លើយសិស្ស', 'ចម្លើយត្រឹមត្រូវ', 'លទ្ធផល', 'ពិន្ទុ']
+      .forEach((text, i) => {
+        doc.text(text, cols[i], thY + 9, { width: i === 1 ? 215 : 75 });
+      });
 
     doc.fillColor('#1f2937');
 
@@ -783,37 +808,50 @@ const exportExamResultPDF = async (req, res) => {
 
       doc.rect(50, rowY, 495, 27).fill(bg);
 
-      const qShort = (ans.questionText || '').length > 58 
-        ? (ans.questionText || '').substring(0, 55) + '...' 
-        : (ans.questionText || '');
+      const questionShort = String(ans.questionText || '').length > 60 
+        ? String(ans.questionText).substring(0, 57) + '...' 
+        : String(ans.questionText || '');
 
-      doc.font('Khmer').fontSize(9.8);
-      doc.text((i + 1).toString(), 57, rowY + 8);
-      doc.text(qShort, 85, rowY + 8, { width: 210 });
-      doc.text((ans.selectedOption || '—').toUpperCase(), 305, rowY + 8);
-      doc.text((ans.correctAnswer || '').toUpperCase(), 375, rowY + 8);
+      doc.font('Khmer').fontSize(9.7);
+      doc.text((i + 1).toString(), 57, rowY + 8.5);
+      doc.text(questionShort, 88, rowY + 8.5, { width: 215 });
+      doc.text(String(ans.selectedOption || '—').toUpperCase(), 310, rowY + 8.5);
+      doc.text(String(ans.correctAnswer || '—').toUpperCase(), 380, rowY + 8.5);
 
       doc.font('Khmer-Bold').fontSize(10)
          .fillColor(isCorrect ? '#22c55e' : '#ef4444')
-         .text(isCorrect ? 'ត្រឹមត្រូវ' : 'ខុស', 445, rowY + 8);
+         .text(isCorrect ? 'ត្រឹមត្រូវ' : 'ខុស', 450, rowY + 8.5);
 
-      doc.fillColor('#1f2937').font('Khmer').fontSize(10)
-         .text(`${ans.pointsEarned}/${ans.points}`, 490, rowY + 8, { align: 'right', width: 45 });
+      doc.fillColor('#1f2937')
+         .font('Khmer')
+         .text(`${ans.pointsEarned || 0}/${ans.points || 0}`, 490, rowY + 8.5, { align: 'right', width: 45 });
 
-      doc.moveDown(1.5);
+      doc.moveDown(1.45);
     });
 
     // Footer
-    const footerY = doc.page.height - 70;
+    const footerY = doc.page.height - 65;
     doc.font('Khmer').fontSize(9.5).fillColor('#64748b');
     doc.text('រៀបចំដោយ៖ លោកគ្រូ ម៉ាន់ វាសនា', 50, footerY, { align: 'center', width: 495 });
-    doc.text(`កាលបរិច្ឆេទ៖ ${new Date().toLocaleDateString('km-KH')}`, 50, footerY + 15, { align: 'center', width: 495 });
+    doc.text(`កាលបរិច្ឆេទ៖ ${new Date().toLocaleDateString('km-KH')}`, 50, footerY + 14, { align: 'center', width: 495 });
 
     doc.end();
 
   } catch (error) {
-    console.error('PDF Error:', error);
-    res.status(500).json({ message: 'មិនអាចបង្កើត PDF បានទេ', error: error.message });
+    console.error('=== PDF Generation Error ===');
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+
+    // Important: If headers already sent, don't try to send JSON
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        message: 'មិនអាចបង្កើត PDF បានទេ', 
+        error: error.message 
+      });
+    } else {
+      // Fallback if pipe already started
+      res.end();
+    }
   }
 };
 
