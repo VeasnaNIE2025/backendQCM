@@ -38,9 +38,9 @@ const {
   createMyQuestion,
   updateMyQuestion,
   deleteMyQuestion,
-  getMyReports
+  getMyReports,
+  getMyClasses          
 } = require('../controllers/teacherController');
-
 // ── Controllers ថ្មី ─────────────────────────────────────
 const {
   createAssignment,
