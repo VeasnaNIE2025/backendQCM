@@ -73,5 +73,7 @@ router.put('/submissions/:submissionId/grade',    gradeSubmission);
 // បន្ថែមមួយបន្ទាត់នេះ
 router.get('/assignments',              getAssignmentsBySubject); // ← ទាញទាំងអស់
 router.get('/assignments/:subjectId',   getAssignmentsBySubject); // ← ទាញតាម subject
+// teacherRoutes.js — បន្ថែម
+router.get('/classes', getMyClasses);
 
 module.exports = router;

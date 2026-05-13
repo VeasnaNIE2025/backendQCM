@@ -93,6 +93,9 @@ const setupAssociations = () => {
   // Submission ↔ Student (User)
   Submission.belongsTo(User,        { foreignKey: 'studentId', as: 'student' });
   User.hasMany(Submission,          { foreignKey: 'studentId', as: 'submissions' });
+
+  Assignment.belongsTo(Class, { foreignKey: 'classId' });
+  Class.hasMany(Assignment,   { foreignKey: 'classId' });
   
   console.log('✅ All database associations established');
 };

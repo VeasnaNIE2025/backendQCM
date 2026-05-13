@@ -192,6 +192,31 @@ const getMyReports = async (req, res) => {
   }
 };
 
+// teacherController.js — បន្ថែម function ថ្មី
+const getMyClasses = async (req, res) => {
+  try {
+    const teacherId = req.user.id;
+
+    // ទាញ classes តាម subjects ដែលគ្រូបង្រៀន
+    const classes = await Class.findAll({
+      include: [{
+        model: Subject,
+        include: [{
+          model: User,
+          as: 'teachers',
+          where: { id: teacherId },
+          required: true
+        }]
+      }]
+    });
+
+    res.json({ classes });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+  
+
 module.exports = {
   getMySubjects,
   getMyStats,

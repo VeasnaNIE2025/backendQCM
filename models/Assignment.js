@@ -18,6 +18,9 @@ const Assignment = sequelize.define('Assignment', {
     type: DataTypes.INTEGER, 
     allowNull: false 
   },
+  classId:     { 
+    type: DataTypes.INTEGER, 
+    allowNull: false },  
   dueDate: { 
     type: DataTypes.DATE, 
     allowNull: false 
