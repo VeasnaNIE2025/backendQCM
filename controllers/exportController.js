@@ -188,213 +188,350 @@ const exportSubjectPerformance = async (req, res) => {
 };
 
 // ── Export single exam result as PDF (with Khmer font) ────────
+// const exportExamResultPDF = async (req, res) => {
+//   try {
+//     const { resultId } = req.params;
+
+//     const result = await sequelize.query(
+//       `SELECT er.*,
+//               u.fullName as studentName, u.email as studentEmail, u.username,
+//               c.name as className,
+//               e.title as examTitle, e.totalPoints, e.duration,
+//               s.name as subjectName
+//        FROM exam_results er
+//        JOIN users u    ON er.studentId = u.id
+//        LEFT JOIN classes c ON u.classId = c.id
+//        JOIN exams e    ON er.examId = e.id
+//        JOIN subjects s ON e.subjectId = s.id
+//        WHERE er.id = :resultId`,
+//       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
+//     );
+
+//     if (!result || result.length === 0) {
+//       return res.status(404).json({ message: 'Result not found' });
+//     }
+
+//     const data = result[0];
+
+//     const answers = await sequelize.query(
+//       `SELECT sa.selectedOption, sa.isCorrect, sa.pointsEarned,
+//               q.questionText, q.correctAnswer, q.points,
+//               q.option_a, q.option_b, q.option_c, q.option_d
+//        FROM student_answers sa
+//        JOIN questions q ON sa.questionId = q.id
+//        WHERE sa.resultId = :resultId
+//        ORDER BY sa.id ASC`,
+//       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
+//     );
+
+//     const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+//     // ✅ Register Khmer font
+//     doc.registerFont('Khmer', FONT);
+//     // Register Bold — fallback to Regular if Bold file not found
+//     try {
+//       doc.registerFont('Khmer-Bold', FONT_BOLD);
+//     } catch {
+//       doc.registerFont('Khmer-Bold', FONT);
+//     }
+
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition',
+//       `attachment; filename="exam_result_${data.id}_${Date.now()}.pdf"`);
+
+//     doc.pipe(res);
+
+//     // ── Header (ទម្រង់ក្រសួង) ──────────────────────────────
+//     const headerTopY = 50;
+
+//     // ── ឆ្វេង: Logo + ឈ្មោះស្ថាប័ន ──
+//     const logoPath = path.join(__dirname, '../assets/logo.png');
+//     try {
+//       doc.image(logoPath, 55, headerTopY, { width: 65 });
+//     } catch {
+//       // no logo — draw placeholder circle
+//       doc.circle(87, headerTopY + 32, 30).stroke('#cccccc');
+//     }
+//     doc.font('Khmer').fontSize(11)
+//        .text('វិចប.ព្រះនរោត្តមសីហមុនី', 50, headerTopY + 70, { width: 130, align: 'center' });
+
+//     // ── ស្ដាំ: ព្រះរាជាណាចក្រ ──
+//     doc.font('Khmer-Bold').fontSize(12)
+//        .text('ព្រះរាជាណាចក្រកម្ពុជា', 320, headerTopY + 5, { width: 220, align: 'center' });
+//     doc.font('Khmer').fontSize(11)
+//        .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 320, headerTopY + 25, { width: 220, align: 'center' });
+//     // underline
+//     doc.moveTo(340, headerTopY + 48).lineTo(530, headerTopY + 48).lineWidth(1).stroke('#333');
+
+//     // ── កណ្ដាល: Title ──
+//     doc.font('Helvetica-Bold').fontSize(15)
+//        .text('QCM Examination System', 50, headerTopY + 85, { width: 495, align: 'center' });
+//     doc.font('Khmer-Bold').fontSize(13)
+//        .text('របាយការណ៍លទ្ធផលប្រឡង', 50, headerTopY + 108, { width: 495, align: 'center' });
+
+//     // ── Divider ──
+//     doc.moveDown(0.3);
+//     const divY = headerTopY + 132;
+//     doc.moveTo(50, divY).lineTo(545, divY).lineWidth(1.5).stroke('#333333');
+//     doc.y = divY + 10;
+
+//     // ── Student Info ─────────────────────────────────────────
+//     doc.font('Khmer').fontSize(11);
+
+//     const L = 50, R = 300; // left and right columns
+//     const drawRow = (label1, val1, label2, val2) => {
+//       const y = doc.y;
+//       doc.font('Khmer-Bold').text(`${label1}:`, L, y, { width: 80, continued: false });
+//       doc.font('Khmer').text(val1 || '—', L + 85, y, { width: 180 });
+//       if (label2) {
+//         doc.font('Khmer-Bold').text(`${label2}:`, R, y, { width: 80, continued: false });
+//         doc.font('Khmer').text(val2 || '—', R + 85, y, { width: 160 });
+//       }
+//       doc.moveDown(1.2);
+//     };
+
+//     drawRow('ឈ្មោះសិស្ស', data.studentName,  'ថ្នាក់',    data.className || '—');
+//     drawRow('អ៊ីមែល',      data.studentEmail, 'មុខវិជ្ជា', data.subjectName);
+//     drawRow('ការប្រឡង',    data.examTitle,    'រយៈពេល',   `${data.duration} នាទី`);
+//     drawRow('ថ្ងៃប្រឡង',   new Date(data.submittedAt).toLocaleDateString('en-GB'), '', '');
+
+//     doc.moveDown(0.5);
+//     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+//     doc.moveDown(0.5);
+
+//     // ── Score Box ────────────────────────────────────────────
+//     const pct    = parseFloat(data.percentage).toFixed(1);
+//     const pctNum = parseFloat(pct);
+//     // ✅ ៣ កម្រិត — ជាប់ / មធ្យម / ធ្លាក់
+//     const resultLabel = pctNum >= 70 ? 'ជាប់' : pctNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
+//     const resultColor = pctNum >= 70 ? '#28a745' : pctNum >= 50 ? '#f39c12' : '#dc3545';
+//     const boxBg       = pctNum >= 70 ? '#e8f5e9' : pctNum >= 50 ? '#fff8e1' : '#ffebee';
+//     const boxY   = doc.y;
+
+//     doc.rect(50, boxY, 495, 55)
+//        .fillAndStroke(boxBg, resultColor);
+//     doc.fillColor('black');
+
+//     doc.font('Khmer-Bold').fontSize(13)
+//        .text(`${data.totalScore} / ${data.totalPoints} ពិន្ទុ`, 65, boxY + 10);
+
+//     doc.font('Khmer-Bold').fontSize(20)
+//        .text(`${pct}%`, 260, boxY + 8, { continued: true });
+
+//     doc.font('Khmer').fontSize(14)
+//        .text(`  >> ${resultLabel}`, { continued: false });
+
+//     doc.moveDown(3.5);
+//     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+//     doc.moveDown(0.5);
+
+//     // ── Answer Table ─────────────────────────────────────────
+//     doc.font('Khmer-Bold').fontSize(11).fillColor('black')
+//        .text('ចម្លើយលម្អិត');
+//     doc.moveDown(0.3);
+
+//     // Table header
+//     const thY = doc.y;
+//     doc.rect(50, thY, 495, 24).fill('#4F81BD');
+//     doc.fillColor('white').font('Khmer-Bold').fontSize(11);
+
+//     doc.text('ល.រ',       55,  thY + 6, { width: 25 });
+//     doc.text('សំណួរ',      82,  thY + 6, { width: 215 });
+//     doc.text('ចម្លើយ',     300, thY + 6, { width: 55 });
+//     doc.text('ត្រឹមត្រូវ',  358, thY + 6, { width: 60 });
+//     doc.text('លទ្ធផល',    422, thY + 6, { width: 55 });
+//     doc.text('ពិន្ទុ',     480, thY + 6, { width: 55 });
+
+//     doc.fillColor('black');
+//     doc.moveDown(1.8);
+
+//     // Rows
+//     answers.forEach((ans, i) => {
+//       if (doc.y > 700) {
+//         doc.addPage();
+//         doc.moveDown(0.5);
+//       }
+
+//       const rowY      = doc.y;
+//       const isCorrect = ans.isCorrect === 1 || ans.isCorrect === true;
+//       const bg        = i % 2 === 0 ? '#f0f4ff' : '#ffffff';
+
+//       doc.rect(50, rowY, 495, 22).fill(bg);
+//       doc.fillColor('black').font('Khmer').fontSize(10);
+
+//       const qShort = (ans.questionText || '').length > 55
+//         ? ans.questionText.substring(0, 52) + '...'
+//         : (ans.questionText || '');
+
+//       doc.text(`${i + 1}`,                                  55,  rowY + 5, { width: 25 });
+//       doc.text(qShort,                                       82,  rowY + 5, { width: 215 });
+//       doc.text((ans.selectedOption || '—').toUpperCase(),    300, rowY + 5, { width: 55 });
+//       doc.text(ans.correctAnswer.toUpperCase(),              358, rowY + 5, { width: 60 });
+
+//       // ✅ ៣ កម្រិត
+//       const rowResult = isCorrect ? 'ជាប់' : 'ធ្លាក់';
+//       const rowColor  = isCorrect ? '#1a7a3a' : '#c0392b';
+
+//       doc.fillColor(rowColor)
+//          .font('Khmer-Bold').fontSize(10)
+//          .text(rowResult,                                       422, rowY + 5, { width: 55 });
+
+//       doc.fillColor('black').font('Khmer').fontSize(10)
+//          .text(`${ans.pointsEarned}/${ans.points}`,          480, rowY + 5, { width: 55 });
+
+//       doc.moveDown(1.6);
+//     });
+
+//     // ── Footer ───────────────────────────────────────────────
+//     doc.moveDown(1);
+//     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+//     doc.moveDown(0.5);
+//     doc.font('Khmer').fontSize(10).fillColor('#888888')
+//        .text('រៀបចំដោយលោកគ្រូ ម៉ាន់ វាសនា', { align: 'center' })
+//        .text(`កាលបរិច្ឆេទ: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
+
+//     doc.end();
+
+//   } catch (error) {
+//     console.error('Error generating PDF:', error);
+//     res.status(500).json({ message: 'មិនអាចបង្កើត PDF បានទេ', error: error.message });
+//   }
+// };
 const exportExamResultPDF = async (req, res) => {
   try {
     const { resultId } = req.params;
 
-    const result = await sequelize.query(
-      `SELECT er.*,
-              u.fullName as studentName, u.email as studentEmail, u.username,
-              c.name as className,
-              e.title as examTitle, e.totalPoints, e.duration,
-              s.name as subjectName
+    const [data] = await sequelize.query(
+      `SELECT er.*, u.fullName as studentName, u.email as studentEmail, c.name as className,
+              e.title as examTitle, e.totalPoints, e.duration, s.name as subjectName
        FROM exam_results er
-       JOIN users u    ON er.studentId = u.id
+       JOIN users u ON er.studentId = u.id
        LEFT JOIN classes c ON u.classId = c.id
-       JOIN exams e    ON er.examId = e.id
+       JOIN exams e ON er.examId = e.id
        JOIN subjects s ON e.subjectId = s.id
        WHERE er.id = :resultId`,
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ message: 'Result not found' });
-    }
-
-    const data = result[0];
+    if (!data) return res.status(404).json({ message: 'រកមិនឃើញទិន្នន័យ' });
 
     const answers = await sequelize.query(
-      `SELECT sa.selectedOption, sa.isCorrect, sa.pointsEarned,
-              q.questionText, q.correctAnswer, q.points,
-              q.option_a, q.option_b, q.option_c, q.option_d
-       FROM student_answers sa
-       JOIN questions q ON sa.questionId = q.id
-       WHERE sa.resultId = :resultId
-       ORDER BY sa.id ASC`,
+      `SELECT sa.selectedOption, sa.isCorrect, sa.pointsEarned, q.questionText, q.correctAnswer, q.points
+       FROM student_answers sa JOIN questions q ON sa.questionId = q.id
+       WHERE sa.resultId = :resultId ORDER BY sa.id ASC`,
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-
-    // ✅ Register Khmer font
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
     doc.registerFont('Khmer', FONT);
-    // Register Bold — fallback to Regular if Bold file not found
-    try {
-      doc.registerFont('Khmer-Bold', FONT_BOLD);
-    } catch {
-      doc.registerFont('Khmer-Bold', FONT);
-    }
+    doc.registerFont('Khmer-Bold', FONT_BOLD);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition',
-      `attachment; filename="exam_result_${data.id}_${Date.now()}.pdf"`);
-
+    res.setHeader('Content-Disposition', `attachment; filename="result_${data.id}.pdf"`);
     doc.pipe(res);
 
-    // ── Header (ទម្រង់ក្រសួង) ──────────────────────────────
-    const headerTopY = 50;
+    // --- Header Section ---
+    // Background Header (Optional decorative line)
+    doc.rect(0, 0, 600, 20).fill('#2c3e50');
 
-    // ── ឆ្វេង: Logo + ឈ្មោះស្ថាប័ន ──
-    const logoPath = path.join(__dirname, '../assets/logo.png');
+    // Kingdom Header
+    doc.fillColor('#2c3e50').font('Khmer-Bold').fontSize(12).text('ព្រះរាជាណាចក្រកម្ពុជា', 350, 45, { align: 'center', width: 200 });
+    doc.font('Khmer').fontSize(10).text('ជាតិ សាសនា ព្រះមហាក្សត្រ', 350, 60, { align: 'center', width: 200 });
+    doc.image(path.join(__dirname, '../assets/line_decoration.png'), 390, 75, { width: 120 }).opacity(0.5); // បើមានរូបបន្ទាត់សញ្ញា
+
+    // Institution Logo & Name
     try {
-      doc.image(logoPath, 55, headerTopY, { width: 65 });
+      doc.image(path.join(__dirname, '../assets/logo.png'), 45, 40, { width: 55 });
     } catch {
-      // no logo — draw placeholder circle
-      doc.circle(87, headerTopY + 32, 30).stroke('#cccccc');
+      doc.circle(72, 65, 25).lineWidth(1).stroke('#ddd');
     }
-    doc.font('Khmer').fontSize(10)
-       .text('វិចប.ព្រះនរោត្តមសីហមុនី', 50, headerTopY + 70, { width: 130, align: 'center' });
+    doc.fillColor('#2c3e50').font('Khmer-Bold').fontSize(10).text('វិទ្យាល័យ ព្រះនរោត្តមសីហមុនី', 45, 100, { width: 150 });
 
-    // ── ស្ដាំ: ព្រះរាជាណាចក្រ ──
-    doc.font('Khmer-Bold').fontSize(12)
-       .text('ព្រះរាជាណាចក្រកម្ពុជា', 320, headerTopY + 5, { width: 220, align: 'center' });
-    doc.font('Khmer').fontSize(11)
-       .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 320, headerTopY + 25, { width: 220, align: 'center' });
-    // underline
-    doc.moveTo(340, headerTopY + 48).lineTo(530, headerTopY + 48).lineWidth(1).stroke('#333');
+    doc.moveDown(4);
+    doc.font('Khmer-Bold').fontSize(18).fillColor('#1a2a3a').text('ព្រឹត្តិបត្រពិន្ទុបុគ្គល', { align: 'center' });
+    doc.font('Khmer').fontSize(10).fillColor('#7f8c8d').text('Individual Examination Report', { align: 'center' });
 
-    // ── កណ្ដាល: Title ──
-    doc.font('Helvetica-Bold').fontSize(15)
-       .text('QCM Examination System', 50, headerTopY + 85, { width: 495, align: 'center' });
-    doc.font('Khmer-Bold').fontSize(13)
-       .text('របាយការណ៍លទ្ធផលប្រឡង', 50, headerTopY + 108, { width: 495, align: 'center' });
-
-    // ── Divider ──
-    doc.moveDown(0.3);
-    const divY = headerTopY + 132;
-    doc.moveTo(50, divY).lineTo(545, divY).lineWidth(1.5).stroke('#333333');
-    doc.y = divY + 10;
-
-    // ── Student Info ─────────────────────────────────────────
-    doc.font('Khmer').fontSize(11);
-
-    const L = 50, R = 300; // left and right columns
-    const drawRow = (label1, val1, label2, val2) => {
-      const y = doc.y;
-      doc.font('Khmer-Bold').text(`${label1}:`, L, y, { width: 80, continued: false });
-      doc.font('Khmer').text(val1 || '—', L + 85, y, { width: 180 });
-      if (label2) {
-        doc.font('Khmer-Bold').text(`${label2}:`, R, y, { width: 80, continued: false });
-        doc.font('Khmer').text(val2 || '—', R + 85, y, { width: 160 });
-      }
-      doc.moveDown(1.2);
+    // --- Info Grid (Modern Card Look) ---
+    doc.moveDown(1.5);
+    const infoY = doc.y;
+    doc.roundedRect(40, infoY, 515, 85, 5).fill('#fdfdfd').stroke('#eaeff2');
+    
+    doc.fillColor('#2c3e50').font('Khmer-Bold').fontSize(10);
+    const drawInfo = (label, value, x, y) => {
+      doc.font('Khmer-Bold').text(label, x, y);
+      doc.font('Khmer').text(`:  ${value || 'N/A'}`, x + 70, y);
     };
 
-    drawRow('ឈ្មោះសិស្ស', data.studentName,  'ថ្នាក់',    data.className || '—');
-    drawRow('អ៊ីមែល',      data.studentEmail, 'មុខវិជ្ជា', data.subjectName);
-    drawRow('ការប្រឡង',    data.examTitle,    'រយៈពេល',   `${data.duration} នាទី`);
-    drawRow('ថ្ងៃប្រឡង',   new Date(data.submittedAt).toLocaleDateString('en-GB'), '', '');
+    drawInfo('ឈ្មោះសិស្ស', data.studentName, 60, infoY + 15);
+    drawInfo('ថ្នាក់រៀន', data.className, 60, infoY + 35);
+    drawInfo('អ៊ីមែល', data.studentEmail, 60, infoY + 55);
 
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    drawInfo('មុខវិជ្ជា', data.subjectName, 310, infoY + 15);
+    drawInfo('ការប្រឡង', data.examTitle, 310, infoY + 35);
+    drawInfo('រយៈពេល', `${data.duration} នាទី`, 310, infoY + 55);
 
-    // ── Score Box ────────────────────────────────────────────
-    const pct    = parseFloat(data.percentage).toFixed(1);
-    const pctNum = parseFloat(pct);
-    // ✅ ៣ កម្រិត — ជាប់ / មធ្យម / ធ្លាក់
-    const resultLabel = pctNum >= 70 ? 'ជាប់' : pctNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
-    const resultColor = pctNum >= 70 ? '#28a745' : pctNum >= 50 ? '#f39c12' : '#dc3545';
-    const boxBg       = pctNum >= 70 ? '#e8f5e9' : pctNum >= 50 ? '#fff8e1' : '#ffebee';
-    const boxY   = doc.y;
+    // --- Score Badge ---
+    doc.moveDown(6);
+    const pct = parseFloat(data.percentage).toFixed(1);
+    const isPass = pct >= 50;
+    const badgeColor = pct >= 75 ? '#27ae60' : (isPass ? '#f39c12' : '#e74c3c');
+    const resultText = pct >= 75 ? 'ល្អប្រសើរ (Great)' : (isPass ? 'ជាប់ (Pass)' : 'ធ្លាក់ (Fail)');
 
-    doc.rect(50, boxY, 495, 55)
-       .fillAndStroke(boxBg, resultColor);
-    doc.fillColor('black');
+    doc.roundedRect(200, doc.y, 200, 50, 10).fill(badgeColor);
+    doc.fillColor('#ffffff').font('Khmer-Bold').fontSize(18).text(`${pct}%`, 200, doc.y + 10, { align: 'center', width: 200 });
+    doc.fontSize(10).text(resultText, 200, doc.y + 28, { align: 'center', width: 200 });
 
-    doc.font('Khmer-Bold').fontSize(13)
-       .text(`${data.totalScore} / ${data.totalPoints} ពិន្ទុ`, 65, boxY + 10);
-
-    doc.font('Khmer-Bold').fontSize(20)
-       .text(`${pct}%`, 260, boxY + 8, { continued: true });
-
-    doc.font('Khmer').fontSize(14)
-       .text(`  >> ${resultLabel}`, { continued: false });
-
-    doc.moveDown(3.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    // --- Answer Table ---
+    doc.moveDown(4);
+    doc.fillColor('#2c3e50').font('Khmer-Bold').fontSize(11).text('វិភាគលទ្ធផលតាមសំណួរ (Answer Analysis)');
     doc.moveDown(0.5);
 
-    // ── Answer Table ─────────────────────────────────────────
-    doc.font('Khmer-Bold').fontSize(11).fillColor('black')
-       .text('ចម្លើយលម្អិត');
-    doc.moveDown(0.3);
+    // Table Header
+    const tableTop = doc.y;
+    doc.rect(40, tableTop, 515, 25).fill('#34495e');
+    doc.fillColor('#ffffff').font('Khmer-Bold').fontSize(9);
+    doc.text('ល.រ', 45, tableTop + 8);
+    doc.text('ខ្លឹមសារសំណួរ', 75, tableTop + 8);
+    doc.text('ចម្លើយសិស្ស', 340, tableTop + 8, { width: 60, align: 'center' });
+    doc.text('ត្រឹមត្រូវ', 405, tableTop + 8, { width: 60, align: 'center' });
+    doc.text('លទ្ធផល', 470, tableTop + 8, { width: 80, align: 'center' });
 
-    // Table header
-    const thY = doc.y;
-    doc.rect(50, thY, 495, 24).fill('#4F81BD');
-    doc.fillColor('white').font('Khmer-Bold').fontSize(11);
-
-    doc.text('ល.រ',       55,  thY + 6, { width: 25 });
-    doc.text('សំណួរ',      82,  thY + 6, { width: 215 });
-    doc.text('ចម្លើយ',     300, thY + 6, { width: 55 });
-    doc.text('ត្រឹមត្រូវ',  358, thY + 6, { width: 60 });
-    doc.text('លទ្ធផល',    422, thY + 6, { width: 55 });
-    doc.text('ពិន្ទុ',     480, thY + 6, { width: 55 });
-
-    doc.fillColor('black');
-    doc.moveDown(1.8);
-
-    // Rows
+    // Table Rows
+    let rowY = tableTop + 25;
     answers.forEach((ans, i) => {
-      if (doc.y > 700) {
-        doc.addPage();
-        doc.moveDown(0.5);
-      }
+      // Check page overflow
+      if (rowY > 740) { doc.addPage(); rowY = 50; }
 
-      const rowY      = doc.y;
       const isCorrect = ans.isCorrect === 1 || ans.isCorrect === true;
-      const bg        = i % 2 === 0 ? '#f0f4ff' : '#ffffff';
-
-      doc.rect(50, rowY, 495, 22).fill(bg);
-      doc.fillColor('black').font('Khmer').fontSize(10);
-
-      const qShort = (ans.questionText || '').length > 55
-        ? ans.questionText.substring(0, 52) + '...'
-        : (ans.questionText || '');
-
-      doc.text(`${i + 1}`,                                  55,  rowY + 5, { width: 25 });
-      doc.text(qShort,                                       82,  rowY + 5, { width: 215 });
-      doc.text((ans.selectedOption || '—').toUpperCase(),    300, rowY + 5, { width: 55 });
-      doc.text(ans.correctAnswer.toUpperCase(),              358, rowY + 5, { width: 60 });
-
-      // ✅ ៣ កម្រិត
-      const rowResult = isCorrect ? 'ជាប់' : 'ធ្លាក់';
-      const rowColor  = isCorrect ? '#1a7a3a' : '#c0392b';
-
-      doc.fillColor(rowColor)
-         .font('Khmer-Bold').fontSize(10)
-         .text(rowResult,                                       422, rowY + 5, { width: 55 });
-
-      doc.fillColor('black').font('Khmer').fontSize(10)
-         .text(`${ans.pointsEarned}/${ans.points}`,          480, rowY + 5, { width: 55 });
-
-      doc.moveDown(1.6);
+      const rowBg = i % 2 === 0 ? '#ffffff' : '#f9f9f9';
+      
+      doc.rect(40, rowY, 515, 25).fill(rowBg);
+      doc.fillColor('#2c3e50').font('Khmer').fontSize(9);
+      
+      doc.text(i + 1, 45, rowY + 8);
+      const qText = ans.questionText.length > 60 ? ans.questionText.substring(0, 57) + '...' : ans.questionText;
+      doc.text(qText, 75, rowY + 8, { width: 260 });
+      
+      doc.font('Khmer-Bold').text(ans.selectedOption || '-', 340, rowY + 8, { width: 60, align: 'center' });
+      doc.text(ans.correctAnswer, 405, rowY + 8, { width: 60, align: 'center' });
+      
+      doc.fillColor(isCorrect ? '#27ae60' : '#e74c3c')
+         .text(isCorrect ? '✔ ត្រឹមត្រូវ' : '✘ ខុស', 470, rowY + 8, { width: 80, align: 'center' });
+      
+      rowY += 25;
+      doc.moveTo(40, rowY).lineTo(555, rowY).lineWidth(0.5).strokeColor('#eee').stroke();
     });
 
-    // ── Footer ───────────────────────────────────────────────
-    doc.moveDown(1);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-    doc.font('Khmer').fontSize(10).fillColor('#888888')
-       .text('រៀបចំដោយលោកគ្រូ ម៉ាន់ វាសនា', { align: 'center' })
-       .text(`កាលបរិច្ឆេទ: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
+    // --- Footer ---
+    const footerY = 780;
+    doc.moveTo(40, footerY).lineTo(555, footerY).lineWidth(1).strokeColor('#2c3e50').stroke();
+    doc.fillColor('#95a5a6').font('Khmer').fontSize(8)
+       .text(`របាយការណ៍នេះបង្កើតដោយស្វ័យប្រវត្តិនៅថ្ងៃទី៖ ${new Date().toLocaleString('km-KH')}`, 40, footerY + 10, { align: 'left' });
+    doc.text('រៀបចំដោយលោកគ្រូ៖ ម៉ាន់ វាសនា', 40, footerY + 10, { align: 'right' });
 
     doc.end();
-
   } catch (error) {
-    console.error('Error generating PDF:', error);
-    res.status(500).json({ message: 'មិនអាចបង្កើត PDF បានទេ', error: error.message });
+    res.status(500).json({ message: 'Error UI', error: error.message });
   }
 };
 
