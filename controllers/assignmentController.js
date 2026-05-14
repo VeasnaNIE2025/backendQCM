@@ -106,9 +106,10 @@ const gradeSubmission = async (req, res) => {
     }
 
     await submission.update({
-      grade, feedback,
+      grade,
+      feedback,
       gradedAt: new Date(),
-      status: 'graded'
+      status: 'graded'    
     });
 
     res.json({ message: 'ដាក់ពិន្ទុដោយជោគជ័យ!', submission });
