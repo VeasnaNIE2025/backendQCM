@@ -1,21 +1,3 @@
-// const { sequelize } = require('../config/db');
-
-// const getMySubjects = async (req, res) => {
-//   try {
-//     const teacherId = req.user.id;
-//     const subjects = await sequelize.query(
-//       `SELECT * FROM subjects WHERE teacherId = :teacherId AND isActive = 1`,
-//       { replacements: { teacherId }, type: sequelize.QueryTypes.SELECT }
-//     );
-//     res.json(subjects);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// module.exports = { getMySubjects };
-
-
 const { sequelize } = require('../config/db');
 
 // 1. Get subjects assigned to this teacher
@@ -173,15 +155,41 @@ const deleteMyQuestion = async (req, res) => {
 };
 
 // 7. Get reports (exam results for teacher's subjects)
+// const getMyReports = async (req, res) => {
+//   try {
+//     const teacherId = req.user.id;
+//     const results = await sequelize.query(
+//       `SELECT er.*, u.fullName as studentName, u.email as studentEmail, e.title as examTitle, e.totalPoints, s.name as subjectName
+//        FROM exam_results er
+//        JOIN exams e ON er.examId = e.id
+//        JOIN subjects s ON e.subjectId = s.id
+//        JOIN users u ON er.studentId = u.id
+//        WHERE s.teacherId = :teacherId AND er.status = 'completed'
+//        ORDER BY er.submittedAt DESC`,
+//       { replacements: { teacherId }, type: sequelize.QueryTypes.SELECT }
+//     );
+//     res.json(results);
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
 const getMyReports = async (req, res) => {
   try {
     const teacherId = req.user.id;
     const results = await sequelize.query(
-      `SELECT er.*, u.fullName as studentName, u.email as studentEmail, e.title as examTitle, e.totalPoints, s.name as subjectName
+      `SELECT 
+         er.*,
+         u.fullName  as studentName,
+         u.email     as studentEmail,
+         e.title     as examTitle,
+         e.totalPoints,
+         s.name      as subjectName,
+         c.name      as className
        FROM exam_results er
-       JOIN exams e ON er.examId = e.id
-       JOIN subjects s ON e.subjectId = s.id
-       JOIN users u ON er.studentId = u.id
+       JOIN exams    e ON er.examId    = e.id
+       JOIN subjects s ON e.subjectId  = s.id
+       JOIN users    u ON er.studentId = u.id
+       LEFT JOIN classes c ON u.classId = c.id
        WHERE s.teacherId = :teacherId AND er.status = 'completed'
        ORDER BY er.submittedAt DESC`,
       { replacements: { teacherId }, type: sequelize.QueryTypes.SELECT }
@@ -206,16 +214,6 @@ const getMyClasses = async (req, res) => {
   }
 };
 
-// module.exports = {
-//   getMySubjects,
-//   getMyStats,
-//   getMyQuestions,
-//   createMyQuestion,
-//   updateMyQuestion,
-//   deleteMyQuestion,
-//   getMyReports,
-//   getMyClasses  
-// };
 module.exports = {
   getMySubjects,
   getMyStats,
