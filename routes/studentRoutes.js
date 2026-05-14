@@ -45,16 +45,16 @@ router.use(protect);
 // ════════════════════════════════════════════════
 // Routes ចាស់ (មិនផ្លាស់អ្វីសោះ)
 // ════════════════════════════════════════════════
-router.get('/exams',              getAvailableExams);
-router.get('/exams/:id',          getExamDetails);
+router.get('/exams',getAvailableExams);
+router.get('/exams/:id',getExamDetails);
 router.post('/exams/:id/submit',  submitExam);
-router.get('/results',            getMyResults);
+router.get('/results',getMyResults);
 
 // ════════════════════════════════════════════════
 // Routes ថ្មី — Assignment
 // ════════════════════════════════════════════════
-router.get('/assignments',                              getStudentAssignments);
-router.post('/assignments/:assignmentId/submit',        uploadDocument.single('file'), submitAssignment);
-router.get('/my-submissions',                           getMySubmissions);
+router.get('/assignments',getStudentAssignments);
+router.post('/assignments/:assignmentId/submit', uploadDocument, submitAssignment);
+router.get('/my-submissions',getMySubmissions);
 
 module.exports = router;
