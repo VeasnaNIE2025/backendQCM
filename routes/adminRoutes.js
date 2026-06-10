@@ -118,8 +118,11 @@
 const express = require('express');
 const { protect, admin } = require('../middleware/authMiddleware');
 
+// ── Controllers ────────────────────────────────────────────────
 const {
-  getUsers, getUserById, createUser, updateUser, deleteUser
+  getUsers, getUserById, createUser, updateUser, deleteUser,
+  downloadUserTemplate,      // ✅ បន្ថែម
+  importUsersFromExcel       // ✅ បន្ថែម
 } = require('../controllers/userController');
 
 const {
@@ -136,7 +139,7 @@ const {
 
 const {
   getStatistics,
-  getClassStatistics,       // ✅ ថ្មី
+  getClassStatistics,
   getExamResultsReport,
   getStudentPerformance,
   getSubjectPerformance,
@@ -149,7 +152,7 @@ const {
   exportExamResults,
   exportStudentPerformance,
   exportSubjectPerformance,
-  exportExamResultPDF 
+  exportExamResultPDF
 } = require('../controllers/exportController');
 
 const {
@@ -158,21 +161,18 @@ const {
   getAllClassesWithSubjects
 } = require('../controllers/classSubjectController');
 
+// ── Multer (for image upload) ──────────────────────────────────
+const imageUpload = require('../middleware/upload');   // rename to avoid conflict
 
-const upload = require('../middleware/upload');
+// ── Multer (for Excel import) ─────────────────────────────────
+const multer = require('multer');
+const excelUpload = multer({ storage: multer.memoryStorage() }); // different name
 
 const router = express.Router();
 
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
-
-
-
-
-
-// ── Image Upload (no auth required) ──────────────────────────
+// ── Image Upload (no auth required) ───────────────────────────
 router.post('/upload-image', (req, res) => {
-  upload.single('image')(req, res, (err) => {
+  imageUpload.single('image')(req, res, (err) => {
     if (err) {
       console.error('Upload error:', err);
       return res.status(400).json({ message: err.message || 'Upload failed' });
@@ -199,6 +199,10 @@ router.post('/users',     createUser);
 router.put('/users/:id',  updateUser);
 router.delete('/users/:id', deleteUser);
 
+// ✅ Import/Export users (Excel)
+router.get('/users/template', downloadUserTemplate);
+router.post('/users/import', excelUpload.single('file'), importUsersFromExcel);
+
 // ── Subject routes ────────────────────────────────────────────
 router.get('/subjects',      getSubjects);
 router.get('/subjects/:id',  getSubjectById);
@@ -222,7 +226,7 @@ router.delete('/exams/:id', deleteExam);
 
 // ── Report routes ─────────────────────────────────────────────
 router.get('/reports/statistics',          getStatistics);
-router.get('/reports/class-statistics',    getClassStatistics);   
+router.get('/reports/class-statistics',    getClassStatistics);
 router.get('/reports/exam-results',        getExamResultsReport);
 router.get('/reports/student-performance', getStudentPerformance);
 router.get('/reports/subject-performance', getSubjectPerformance);
@@ -230,14 +234,10 @@ router.get('/reports/exam-analytics',      getExamAnalytics);
 router.get('/reports/top-students',        getTopStudents);
 router.get('/reports/recent-activities',   getRecentActivities);
 
-// ── Export routes (Excel) ─────────────────────────────────────
+// ── Export routes (Excel & PDF) ───────────────────────────────
 router.get('/export/exam-results',         exportExamResults);
 router.get('/export/student-performance',  exportStudentPerformance);
 router.get('/export/subject-performance',  exportSubjectPerformance);
 router.get('/export/result/:resultId/pdf', exportExamResultPDF);
-
-
-router.get('/users/template', downloadUserTemplate);
-router.post('/users/import', upload.single('file'), importUsersFromExcel);
 
 module.exports = router;
