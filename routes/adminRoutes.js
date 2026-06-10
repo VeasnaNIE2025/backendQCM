@@ -163,6 +163,13 @@ const upload = require('../middleware/upload');
 
 const router = express.Router();
 
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+
+
+
+
 // ── Image Upload (no auth required) ──────────────────────────
 router.post('/upload-image', (req, res) => {
   upload.single('image')(req, res, (err) => {
@@ -228,5 +235,9 @@ router.get('/export/exam-results',         exportExamResults);
 router.get('/export/student-performance',  exportStudentPerformance);
 router.get('/export/subject-performance',  exportSubjectPerformance);
 router.get('/export/result/:resultId/pdf', exportExamResultPDF);
+
+
+router.get('/users/template', downloadUserTemplate);
+router.post('/users/import', upload.single('file'), importUsersFromExcel);
 
 module.exports = router;
