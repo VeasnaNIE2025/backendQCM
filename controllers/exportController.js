@@ -187,43 +187,43 @@ const exportSubjectPerformance = async (req, res) => {
   }
 };
 
-// ── Helper: draw wrapped text and return new Y ────────────────
-const drawText = (doc, text, x, y, options = {}) => {
-  doc.text(text, x, y, options);
-  return doc.y;
+// ── Helper: measure text height safely ───────────────────────
+const measureH = (doc, text, width, fontSize = 10) => {
+  doc.fontSize(fontSize);
+  return Math.max(doc.heightOfString(String(text || ''), { width }) + 8, 22);
 };
 
-// ── Helper: draw one option line ──────────────────────────────
-// Returns height used
+// ── Helper: draw one option block, return height used ─────────
 const drawOption = (doc, label, text, isCorrect, isSelected, x, y, width) => {
-  let bgColor = '#ffffff';
+  let bgColor   = '#f5f5f5';
   let textColor = '#333333';
-  let prefix = '';
+  let borderCol = '#cccccc';
+  let icon      = '';
+  let bold      = false;
 
   if (isCorrect && isSelected) {
-    bgColor   = '#d4edda'; // green — correct & chosen
-    textColor = '#155724';
-    prefix    = '✓ ';
+    bgColor   = '#d4edda'; textColor = '#155724';
+    borderCol = '#28a745'; icon = '✓ '; bold = true;
   } else if (isCorrect && !isSelected) {
-    bgColor   = '#cce5ff'; // blue — correct but NOT chosen (show student missed it)
-    textColor = '#004085';
-    prefix    = '● ';
+    bgColor   = '#cce5ff'; textColor = '#004085';
+    borderCol = '#0066cc'; icon = '● '; bold = true;
   } else if (!isCorrect && isSelected) {
-    bgColor   = '#f8d7da'; // red — wrong choice
-    textColor = '#721c24';
-    prefix    = '✗ ';
+    bgColor   = '#f8d7da'; textColor = '#721c24';
+    borderCol = '#dc3545'; icon = '✗ '; bold = true;
   }
 
-  // measure text height
-  const fullText = `${label}. ${prefix}${text || ''}`;
-  const textHeight = doc.heightOfString(fullText, { width: width - 10 });
-  const rowH = Math.max(textHeight + 8, 20);
+  const fullText  = `${label}. ${icon}${text || ''}`;
+  const innerW    = width - 12;
+  doc.font(bold ? 'Khmer-Bold' : 'Khmer').fontSize(10);
+  const textH     = doc.heightOfString(fullText, { width: innerW });
+  const boxH      = Math.max(textH + 10, 24);
 
-  doc.rect(x, y, width, rowH).fill(bgColor).stroke('#dddddd');
-  doc.fillColor(textColor).font(isCorrect || isSelected ? 'Khmer-Bold' : 'Khmer').fontSize(10)
-     .text(fullText, x + 5, y + 4, { width: width - 10 });
+  doc.rect(x, y, width, boxH).fill(bgColor).stroke(borderCol);
+  doc.fillColor(textColor)
+     .font(bold ? 'Khmer-Bold' : 'Khmer').fontSize(10)
+     .text(fullText, x + 6, y + 5, { width: innerW, lineBreak: true });
 
-  return rowH;
+  return boxH;
 };
 
 // ── Export single exam result as PDF ─────────────────────────
@@ -390,130 +390,180 @@ const exportExamResultPDF = async (req, res) => {
     doc.y = boxY + 75;
 
     // ════════════════════════════════════════════════════════
-    //  COLOR LEGEND
+    //  COLOR LEGEND  — NO continued:true  ✅
     // ════════════════════════════════════════════════════════
-    doc.moveDown(0.4);
+    doc.moveDown(0.5);
     const legY = doc.y;
-    doc.fontSize(10).font('Khmer').fillColor('#333')
-       .text('សញ្ញាពណ៌:', 50, legY, { continued: true });
 
-    // Green box
-    doc.rect(110, legY + 1, 12, 12).fill('#d4edda').stroke('#28a745');
-    doc.fillColor('#155724').text('  ចម្លើយត្រឹមត្រូវ (ជ្រើសរើស)', 124, legY, { continued: true });
+    // background strip
+    doc.rect(50, legY, 495, 22).fill('#f0f0f0').stroke('#cccccc');
 
-    // Blue box
-    doc.rect(295, legY + 1, 12, 12).fill('#cce5ff').stroke('#004085');
-    doc.fillColor('#004085').text('  ចម្លើយត្រូវ (មិនបានជ្រើស)', 309, legY, { continued: true });
+    // label
+    doc.font('Khmer-Bold').fontSize(10).fillColor('#333')
+       .text('សញ្ញាពណ៌:', 55, legY + 5, { width: 65 });
 
-    // Red box
-    doc.rect(465, legY + 1, 12, 12).fill('#f8d7da').stroke('#721c24');
-    doc.fillColor('#721c24').text('  ចម្លើយខុស', 479, legY);
+    // 🟢 green swatch + label
+    doc.rect(122, legY + 5, 11, 11).fill('#d4edda').stroke('#28a745');
+    doc.font('Khmer').fontSize(10).fillColor('#155724')
+       .text('ត្រូវ (ជ្រើស)', 136, legY + 5, { width: 85 });
+
+    // 🔵 blue swatch + label
+    doc.rect(228, legY + 5, 11, 11).fill('#cce5ff').stroke('#004085');
+    doc.font('Khmer').fontSize(10).fillColor('#004085')
+       .text('ត្រូវ (មិនជ្រើស)', 242, legY + 5, { width: 100 });
+
+    // 🔴 red swatch + label
+    doc.rect(350, legY + 5, 11, 11).fill('#f8d7da').stroke('#dc3545');
+    doc.font('Khmer').fontSize(10).fillColor('#721c24')
+       .text('ខុស (ជ្រើស)', 364, legY + 5, { width: 80 });
+
+    // ⬜ grey swatch + label
+    doc.rect(452, legY + 5, 11, 11).fill('#f5f5f5').stroke('#cccccc');
+    doc.font('Khmer').fontSize(10).fillColor('#555')
+       .text('មិនមែន', 466, legY + 5, { width: 70 });
 
     doc.fillColor('black');
-    doc.moveDown(0.8);
+    doc.y = legY + 30;
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#cccccc');
-    doc.moveDown(0.5);
+    doc.moveDown(0.4);
 
     // ════════════════════════════════════════════════════════
-    //  QUESTION DETAIL SECTION
+    //  QUESTION DETAIL — explicit Y coords, no overlap ✅
     // ════════════════════════════════════════════════════════
-    doc.font('Khmer-Bold').fontSize(12).fillColor('#333333')
-       .text('លម្អិតសំណួរ និងចម្លើយ', { align: 'center' });
-    doc.moveDown(0.5);
+    doc.font('Khmer-Bold').fontSize(12).fillColor('#1a1a1a')
+       .text('លម្អិតសំណួរ និងចម្លើយ', 50, doc.y, { width: 495, align: 'center' });
+    doc.moveDown(0.4);
 
-    const PAGE_BOTTOM = 790;
-    const optionMap   = { a: 'option_a', b: 'option_b', c: 'option_c', d: 'option_d' };
+    const PAGE_BOTTOM  = 800;
+    const MARGIN_LEFT  = 50;
+    const PAGE_WIDTH   = 495;
+    const optionMap    = { a: 'option_a', b: 'option_b', c: 'option_c', d: 'option_d' };
     const optionLabels = ['a', 'b', 'c', 'd'];
+    const COL_W        = 242;  // each option column width
+    const COL_GAP      = 11;
+    const COL2_X       = MARGIN_LEFT + COL_W + COL_GAP;
 
     answers.forEach((ans, idx) => {
-      const isCorrect    = ans.isCorrect === 1 || ans.isCorrect === true;
-      const selected     = (ans.selectedOption || '').toLowerCase();
-      const correct      = (ans.correctAnswer  || '').toLowerCase();
+      const isCorrect = ans.isCorrect === 1 || ans.isCorrect === true;
+      const selected  = (ans.selectedOption || '').toLowerCase();
+      const correct   = (ans.correctAnswer  || '').toLowerCase();
 
-      // ── Estimate block height before drawing ──
-      const qH         = doc.heightOfString(ans.questionText || '', { width: 440 }) + 10;
-      const optH        = optionLabels.reduce((sum, lbl) => {
-        const txt = ans[optionMap[lbl]] || '';
-        return sum + Math.max(doc.heightOfString(`${lbl}. ${txt}`, { width: 210 }) + 8, 20) + 3;
-      }, 0);
-      const blockHeight = qH + optH + 30;
+      // ── Pre-measure full block height ────────────────────
+      doc.font('Khmer-Bold').fontSize(11);
+      const qTextH = doc.heightOfString(String(ans.questionText || ''), { width: 360 }) + 14;
+      const qRowH  = Math.max(qTextH, 26);
 
-      // ── New page if not enough space ──
-      if (doc.y + blockHeight > PAGE_BOTTOM) {
-        doc.addPage();
-        // repeat mini-header on new page
-        doc.font('Khmer').fontSize(9).fillColor('#888')
-           .text(`${data.studentName}  |  ${data.examTitle}  |  ${pct}%`, 50, 30, { width: 495, align: 'center' });
-        doc.moveTo(50, 48).lineTo(545, 48).stroke('#cccccc');
-        doc.y = 58;
-      }
-
-      // ── Question box header ──
-      const qBoxY   = doc.y;
-      const qBg     = isCorrect ? '#e8f5e9' : '#fff3cd';
-      const qBorder = isCorrect ? '#28a745' : '#e67e22';
-
-      // Question number badge
-      doc.rect(50, qBoxY, 30, 22)
-         .fill(isCorrect ? '#28a745' : '#dc3545');
-      doc.fillColor('white').font('Khmer-Bold').fontSize(11)
-         .text(`${idx + 1}`, 50, qBoxY + 5, { width: 30, align: 'center' });
-
-      // Points badge (right side)
-      const ptsTxt = `${ans.pointsEarned}/${ans.points} ពិន្ទុ`;
-      doc.rect(460, qBoxY, 85, 22)
-         .fill(isCorrect ? '#28a745' : '#dc3545');
-      doc.fillColor('white').font('Khmer').fontSize(10)
-         .text(ptsTxt, 462, qBoxY + 5, { width: 81, align: 'center' });
-
-      // Question text background
-      const qTextH = doc.heightOfString(ans.questionText || '', { width: 390 }) + 12;
-      doc.rect(80, qBoxY, 380, Math.max(qTextH, 22)).fill(qBg).stroke(qBorder);
-      doc.fillColor('#1a1a1a').font('Khmer-Bold').fontSize(11)
-         .text(ans.questionText || '(គ្មានអត្ថបទ)', 85, qBoxY + 6, { width: 370 });
-
-      doc.y = qBoxY + Math.max(qTextH, 22) + 6;
-
-      // ── Options (2-column layout) ──
-      const optStartY = doc.y;
-      const colW      = 238;
-      const colGap    = 9;
-      const col1      = 50;
-      const col2      = col1 + colW + colGap;
-
-      let leftY  = optStartY;
-      let rightY = optStartY;
-
-      optionLabels.forEach((lbl, i) => {
-        const optText    = ans[optionMap[lbl]] || '';
-        const isThisCorr = lbl === correct;
-        const isThisSel  = lbl === selected;
-
-        const xPos = (i % 2 === 0) ? col1 : col2;
-        const yPos = (i % 2 === 0) ? leftY : rightY;
-
-        const h = drawOption(doc, lbl.toUpperCase(), optText,
-                             isThisCorr, isThisSel, xPos, yPos, colW);
-
-        if (i % 2 === 0) leftY  += h + 4;
-        else             rightY += h + 4;
+      // measure each option
+      const optHeights = optionLabels.map(lbl => {
+        const lblU   = lbl.toUpperCase();
+        const txt    = ans[optionMap[lbl]] || '';
+        const isCo   = lbl === correct;
+        const isSel  = lbl === selected;
+        const icon   = (isCo && isSel) ? '✓ ' : (isCo && !isSel) ? '● ' : (!isCo && isSel) ? '✗ ' : '';
+        doc.font((isCo || isSel) ? 'Khmer-Bold' : 'Khmer').fontSize(10);
+        const h = doc.heightOfString(`${lblU}. ${icon}${txt}`, { width: COL_W - 12 });
+        return Math.max(h + 10, 24);
       });
 
-      doc.y = Math.max(leftY, rightY) + 6;
+      // 2-column pairing: row1 = A+B, row2 = C+D
+      const row1H = Math.max(optHeights[0], optHeights[1]) + 4;
+      const row2H = Math.max(optHeights[2], optHeights[3]) + 4;
+      const sumH  = 22;
+      const totalBlockH = qRowH + row1H + row2H + sumH + 20;
 
-      // ── Summary line ──
-      const sumY = doc.y;
-      doc.rect(50, sumY, 495, 20).fill('#f8f9fa').stroke('#dee2e6');
-      doc.fillColor('#004085').font('Khmer').fontSize(10)
-         .text(`ចម្លើយត្រឹមត្រូវ: ${correct.toUpperCase()}`, 60, sumY + 4, { continued: true });
-      doc.fillColor(isCorrect ? '#155724' : '#721c24')
-         .text(`   |   ចម្លើយសិស្ស: ${selected ? selected.toUpperCase() : '—'}`, { continued: true });
-      doc.fillColor(isCorrect ? '#155724' : '#721c24')
-         .font('Khmer-Bold')
-         .text(`   |   ${isCorrect ? '✓ ត្រឹមត្រូវ' : '✗ ខុស'}`);
-      doc.fillColor('black');
+      // ── New page check ────────────────────────────────────
+      if (doc.y + totalBlockH > PAGE_BOTTOM) {
+        doc.addPage();
+        doc.font('Khmer').fontSize(9).fillColor('#888888')
+           .text(
+             `${data.studentName}  |  ${data.examTitle}  |  ${pct}%`,
+             50, 25, { width: 495, align: 'center' }
+           );
+        doc.moveTo(50, 42).lineTo(545, 42).lineWidth(0.8).stroke('#cccccc');
+        doc.y = 52;
+      }
 
-      doc.moveDown(0.8);
+      // ── Draw question header row ──────────────────────────
+      let curY = doc.y;
+
+      // number badge [idx+1]
+      const badgeColor = isCorrect ? '#28a745' : '#dc3545';
+      doc.rect(MARGIN_LEFT, curY, 28, qRowH).fill(badgeColor);
+      doc.font('Khmer-Bold').fontSize(11).fillColor('white')
+         .text(`${idx + 1}`, MARGIN_LEFT, curY + (qRowH - 14) / 2,
+               { width: 28, align: 'center' });
+
+      // points badge [right]
+      const ptsTxt  = `${ans.pointsEarned}/${ans.points}ព`;
+      const ptsBoxW = 62;
+      const ptsX    = MARGIN_LEFT + PAGE_WIDTH - ptsBoxW;
+      doc.rect(ptsX, curY, ptsBoxW, qRowH).fill(badgeColor);
+      doc.font('Khmer').fontSize(9).fillColor('white')
+         .text(ptsTxt, ptsX + 2, curY + (qRowH - 12) / 2,
+               { width: ptsBoxW - 4, align: 'center' });
+
+      // question text box
+      const qBg     = isCorrect ? '#eafaf1' : '#fff8e1';
+      const qBorder = isCorrect ? '#28a745' : '#e67e22';
+      const qBoxX   = MARGIN_LEFT + 28;
+      const qBoxW   = PAGE_WIDTH - 28 - ptsBoxW;
+      doc.rect(qBoxX, curY, qBoxW, qRowH).fill(qBg).stroke(qBorder);
+      doc.font('Khmer-Bold').fontSize(11).fillColor('#1a1a1a')
+         .text(ans.questionText || '(គ្មានអត្ថបទ)',
+               qBoxX + 6, curY + 5,
+               { width: qBoxW - 12, lineBreak: true });
+
+      curY += qRowH + 4;
+
+      // ── Draw options — row 1: A (left) + B (right) ────────
+      const hA = drawOption(doc, 'A', ans.option_a, 'a' === correct, 'a' === selected,
+                            MARGIN_LEFT, curY, COL_W);
+      const hB = drawOption(doc, 'B', ans.option_b, 'b' === correct, 'b' === selected,
+                            COL2_X, curY, COL_W);
+      curY += Math.max(hA, hB) + 4;
+
+      // ── Draw options — row 2: C (left) + D (right) ────────
+      const hC = drawOption(doc, 'C', ans.option_c, 'c' === correct, 'c' === selected,
+                            MARGIN_LEFT, curY, COL_W);
+      const hD = drawOption(doc, 'D', ans.option_d, 'd' === correct, 'd' === selected,
+                            COL2_X, curY, COL_W);
+      curY += Math.max(hC, hD) + 4;
+
+      // ── Summary bar ───────────────────────────────────────
+      doc.rect(MARGIN_LEFT, curY, PAGE_WIDTH, sumH).fill('#f0f4f8').stroke('#d0d8e0');
+
+      // correct answer label
+      doc.font('Khmer-Bold').fontSize(10).fillColor('#004085')
+         .text('ចម្លើយត្រឹមត្រូវ:', MARGIN_LEFT + 6, curY + 5, { width: 110 });
+      doc.font('Khmer-Bold').fontSize(11).fillColor('#155724')
+         .text(correct.toUpperCase(), MARGIN_LEFT + 118, curY + 4, { width: 30 });
+
+      // divider
+      doc.moveTo(MARGIN_LEFT + 155, curY + 4)
+         .lineTo(MARGIN_LEFT + 155, curY + sumH - 4)
+         .stroke('#aaaaaa');
+
+      // student answer label
+      doc.font('Khmer-Bold').fontSize(10).fillColor('#555')
+         .text('ចម្លើយសិស្ស:', MARGIN_LEFT + 162, curY + 5, { width: 95 });
+      doc.font('Khmer-Bold').fontSize(11)
+         .fillColor(isCorrect ? '#155724' : '#721c24')
+         .text(selected ? selected.toUpperCase() : '—',
+               MARGIN_LEFT + 256, curY + 4, { width: 30 });
+
+      // divider
+      doc.moveTo(MARGIN_LEFT + 292, curY + 4)
+         .lineTo(MARGIN_LEFT + 292, curY + sumH - 4)
+         .stroke('#aaaaaa');
+
+      // result icon
+      doc.font('Khmer-Bold').fontSize(11)
+         .fillColor(isCorrect ? '#155724' : '#721c24')
+         .text(isCorrect ? '✓ ត្រឹមត្រូវ' : '✗ ខុស',
+               MARGIN_LEFT + 298, curY + 5, { width: 120 });
+
+      curY += sumH + 10;
+      doc.y = curY;
     });
 
     // ════════════════════════════════════════════════════════
