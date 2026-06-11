@@ -187,11 +187,51 @@ const exportSubjectPerformance = async (req, res) => {
   }
 };
 
-// ── Export single exam result as PDF (with Khmer font) ────────
+// ── Helper: draw wrapped text and return new Y ────────────────
+const drawText = (doc, text, x, y, options = {}) => {
+  doc.text(text, x, y, options);
+  return doc.y;
+};
+
+// ── Helper: draw one option line ──────────────────────────────
+// Returns height used
+const drawOption = (doc, label, text, isCorrect, isSelected, x, y, width) => {
+  let bgColor = '#ffffff';
+  let textColor = '#333333';
+  let prefix = '';
+
+  if (isCorrect && isSelected) {
+    bgColor   = '#d4edda'; // green — correct & chosen
+    textColor = '#155724';
+    prefix    = '✓ ';
+  } else if (isCorrect && !isSelected) {
+    bgColor   = '#cce5ff'; // blue — correct but NOT chosen (show student missed it)
+    textColor = '#004085';
+    prefix    = '● ';
+  } else if (!isCorrect && isSelected) {
+    bgColor   = '#f8d7da'; // red — wrong choice
+    textColor = '#721c24';
+    prefix    = '✗ ';
+  }
+
+  // measure text height
+  const fullText = `${label}. ${prefix}${text || ''}`;
+  const textHeight = doc.heightOfString(fullText, { width: width - 10 });
+  const rowH = Math.max(textHeight + 8, 20);
+
+  doc.rect(x, y, width, rowH).fill(bgColor).stroke('#dddddd');
+  doc.fillColor(textColor).font(isCorrect || isSelected ? 'Khmer-Bold' : 'Khmer').fontSize(10)
+     .text(fullText, x + 5, y + 4, { width: width - 10 });
+
+  return rowH;
+};
+
+// ── Export single exam result as PDF ─────────────────────────
 const exportExamResultPDF = async (req, res) => {
   try {
     const { resultId } = req.params;
 
+    // ── Fetch result info ──────────────────────────────────
     const result = await sequelize.query(
       `SELECT er.*,
               u.fullName as studentName, u.email as studentEmail, u.username,
@@ -199,24 +239,32 @@ const exportExamResultPDF = async (req, res) => {
               e.title as examTitle, e.totalPoints, e.duration,
               s.name as subjectName
        FROM exam_results er
-       JOIN users u    ON er.studentId = u.id
+       JOIN users u        ON er.studentId = u.id
        LEFT JOIN classes c ON u.classId = c.id
-       JOIN exams e    ON er.examId = e.id
-       JOIN subjects s ON e.subjectId = s.id
+       JOIN exams e        ON er.examId = e.id
+       JOIN subjects s     ON e.subjectId = s.id
        WHERE er.id = :resultId`,
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    if (!result || result.length === 0) {
+    if (!result || result.length === 0)
       return res.status(404).json({ message: 'Result not found' });
-    }
 
     const data = result[0];
 
+    // ── Fetch answers + full question detail ───────────────
     const answers = await sequelize.query(
-      `SELECT sa.selectedOption, sa.isCorrect, sa.pointsEarned,
-              q.questionText, q.correctAnswer, q.points,
-              q.option_a, q.option_b, q.option_c, q.option_d
+      `SELECT
+         sa.selectedOption,
+         sa.isCorrect,
+         sa.pointsEarned,
+         q.questionText,
+         q.correctAnswer,
+         q.points,
+         q.option_a,
+         q.option_b,
+         q.option_c,
+         q.option_d
        FROM student_answers sa
        JOIN questions q ON sa.questionId = q.id
        WHERE sa.resultId = :resultId
@@ -224,168 +272,256 @@ const exportExamResultPDF = async (req, res) => {
       { replacements: { resultId }, type: sequelize.QueryTypes.SELECT }
     );
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    // ── Create PDF ─────────────────────────────────────────
+    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
 
-    // ✅ Register Khmer font
     doc.registerFont('Khmer', FONT);
-    // Register Bold — fallback to Regular if Bold file not found
-    try {
-      doc.registerFont('Khmer-Bold', FONT_BOLD);
-    } catch {
-      doc.registerFont('Khmer-Bold', FONT);
-    }
+    try { doc.registerFont('Khmer-Bold', FONT_BOLD); }
+    catch { doc.registerFont('Khmer-Bold', FONT); }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition',
       `attachment; filename="exam_result_${data.id}_${Date.now()}.pdf"`);
-
     doc.pipe(res);
 
-    // ── Header (ទម្រង់ក្រសួង) ──────────────────────────────
-    const headerTopY = 50;
+    // ════════════════════════════════════════════════════════
+    //  PAGE HEADER (repeated on each page via function)
+    // ════════════════════════════════════════════════════════
+    const drawPageHeader = () => {
+      const topY = 35;
 
-    // ── ឆ្វេង: Logo + ឈ្មោះស្ថាប័ន ──
-    const logoPath = path.join(__dirname, '../assets/logo.png');
-    try {
-      doc.image(logoPath, 55, headerTopY, { width: 65 });
-    } catch {
-      // no logo — draw placeholder circle
-      doc.circle(87, headerTopY + 32, 30).stroke('#cccccc');
-    }
-    doc.font('Khmer').fontSize(11)
-       .text('វិចប.ព្រះនរោត្តមសីហមុនី', 50, headerTopY + 70, { width: 130, align: 'center' });
+      // Logo
+      const logoPath = path.join(__dirname, '../assets/logo.png');
+      try { doc.image(logoPath, 55, topY, { width: 60 }); }
+      catch { doc.circle(85, topY + 28, 25).stroke('#cccccc'); }
 
-    // ── ស្ដាំ: ព្រះរាជាណាចក្រ ──
-    doc.font('Khmer-Bold').fontSize(12)
-       .text('ព្រះរាជាណាចក្រកម្ពុជា', 320, headerTopY + 5, { width: 220, align: 'center' });
-    doc.font('Khmer').fontSize(11)
-       .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 320, headerTopY + 25, { width: 220, align: 'center' });
-    // underline
-    doc.moveTo(340, headerTopY + 48).lineTo(530, headerTopY + 48).lineWidth(1).stroke('#333');
+      doc.font('Khmer').fontSize(10)
+         .fillColor('#333')
+         .text('វិចប.ព្រះនរោត្តមសីហមុនី', 48, topY + 65, { width: 125, align: 'center' });
 
-    // ── កណ្ដាល: Title ──
-    doc.font('Helvetica-Bold').fontSize(15)
-       .text('QCM Examination System', 50, headerTopY + 85, { width: 495, align: 'center' });
-    doc.font('Khmer-Bold').fontSize(13)
-       .text('របាយការណ៍លទ្ធផលប្រឡង', 50, headerTopY + 108, { width: 495, align: 'center' });
+      // Right: Kingdom header
+      doc.font('Khmer-Bold').fontSize(12).fillColor('black')
+         .text('ព្រះរាជាណាចក្រកម្ពុជា', 320, topY + 3, { width: 220, align: 'center' });
+      doc.font('Khmer').fontSize(11)
+         .text('ជាតិ  សាសនា  ព្រះមហាក្សត្រ', 320, topY + 22, { width: 220, align: 'center' });
+      doc.moveTo(338, topY + 44).lineTo(532, topY + 44).lineWidth(1).stroke('#333');
 
-    // ── Divider ──
-    doc.moveDown(0.3);
-    const divY = headerTopY + 132;
-    doc.moveTo(50, divY).lineTo(545, divY).lineWidth(1.5).stroke('#333333');
-    doc.y = divY + 10;
+      // Center title
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('black')
+         .text('QCM Examination System', 50, topY + 80, { width: 495, align: 'center' });
+      doc.font('Khmer-Bold').fontSize(12)
+         .text('របាយការណ៍លទ្ធផលប្រឡង', 50, topY + 100, { width: 495, align: 'center' });
 
-    // ── Student Info ─────────────────────────────────────────
-    doc.font('Khmer').fontSize(11);
-
-    const L = 50, R = 300; // left and right columns
-    const drawRow = (label1, val1, label2, val2) => {
-      const y = doc.y;
-      doc.font('Khmer-Bold').text(`${label1}:`, L, y, { width: 80, continued: false });
-      doc.font('Khmer').text(val1 || '—', L + 85, y, { width: 180 });
-      if (label2) {
-        doc.font('Khmer-Bold').text(`${label2}:`, R, y, { width: 80, continued: false });
-        doc.font('Khmer').text(val2 || '—', R + 85, y, { width: 160 });
-      }
-      doc.moveDown(1.2);
+      // Divider
+      const divY = topY + 122;
+      doc.moveTo(50, divY).lineTo(545, divY).lineWidth(1.5).stroke('#333');
+      doc.y = divY + 10;
     };
 
-    drawRow('ឈ្មោះសិស្ស', data.studentName,  'ថ្នាក់',    data.className || '—');
-    drawRow('អ៊ីមែល',      data.studentEmail, 'មុខវិជ្ជា', data.subjectName);
-    drawRow('ការប្រឡង',    data.examTitle,    'រយៈពេល',   `${data.duration} នាទី`);
-    drawRow('ថ្ងៃប្រឡង',   new Date(data.submittedAt).toLocaleDateString('en-GB'), '', '');
+    drawPageHeader();
 
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    // ════════════════════════════════════════════════════════
+    //  STUDENT INFO SECTION
+    // ════════════════════════════════════════════════════════
+    const infoStartY = doc.y;
+    const col1X = 50, col2X = 300;
 
-    // ── Score Box ────────────────────────────────────────────
-    const pct    = parseFloat(data.percentage).toFixed(1);
-    const pctNum = parseFloat(pct);
-    // ✅ ៣ កម្រិត — ជាប់ / មធ្យម / ធ្លាក់
-    const resultLabel = pctNum >= 70 ? 'ជាប់' : pctNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
-    const resultColor = pctNum >= 70 ? '#28a745' : pctNum >= 50 ? '#f39c12' : '#dc3545';
-    const boxBg       = pctNum >= 70 ? '#e8f5e9' : pctNum >= 50 ? '#fff8e1' : '#ffebee';
-    const boxY   = doc.y;
+    const infoRows = [
+      ['ឈ្មោះសិស្ស',  data.studentName,                                      'ថ្នាក់',     data.className    || '—'],
+      ['អ៊ីមែល',       data.studentEmail,                                     'មុខវិជ្ជា',  data.subjectName],
+      ['ការប្រឡង',     data.examTitle,                                        'រយៈពេល',   `${data.duration} នាទី`],
+      ['ថ្ងៃប្រឡង',    new Date(data.submittedAt).toLocaleDateString('en-GB'), '',           ''],
+    ];
 
-    doc.rect(50, boxY, 495, 55)
-       .fillAndStroke(boxBg, resultColor);
-    doc.fillColor('black');
-
-    doc.font('Khmer-Bold').fontSize(13)
-       .text(`${data.totalScore} / ${data.totalPoints} ពិន្ទុ`, 65, boxY + 10);
-
-    doc.font('Khmer-Bold').fontSize(20)
-       .text(`${pct}%`, 260, boxY + 8, { continued: true });
-
-    doc.font('Khmer').fontSize(14)
-       .text(`  >> ${resultLabel}`, { continued: false });
-
-    doc.moveDown(3.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    // ── Answer Table ─────────────────────────────────────────
-    doc.font('Khmer-Bold').fontSize(11).fillColor('black')
-       .text('ចម្លើយលម្អិត');
-    doc.moveDown(0.3);
-
-    // Table header
-    const thY = doc.y;
-    doc.rect(50, thY, 495, 24).fill('#4F81BD');
-    doc.fillColor('white').font('Khmer-Bold').fontSize(11);
-
-    doc.text('ល.រ',       55,  thY + 6, { width: 25 });
-    doc.text('សំណួរ',      82,  thY + 6, { width: 215 });
-    doc.text('ចម្លើយ',     300, thY + 6, { width: 55 });
-    doc.text('ត្រឹមត្រូវ',  358, thY + 6, { width: 60 });
-    doc.text('លទ្ធផល',    422, thY + 6, { width: 55 });
-    doc.text('ពិន្ទុ',     480, thY + 6, { width: 55 });
-
-    doc.fillColor('black');
-    doc.moveDown(1.8);
-
-    // Rows
-    answers.forEach((ans, i) => {
-      if (doc.y > 700) {
-        doc.addPage();
-        doc.moveDown(0.5);
+    infoRows.forEach(([l1, v1, l2, v2]) => {
+      const y = doc.y;
+      doc.font('Khmer-Bold').fontSize(11).fillColor('black')
+         .text(`${l1}:`, col1X, y, { width: 80 });
+      doc.font('Khmer').fontSize(11)
+         .text(v1 || '—', col1X + 85, y, { width: 190 });
+      if (l2) {
+        doc.font('Khmer-Bold').fontSize(11)
+           .text(`${l2}:`, col2X, y, { width: 80 });
+        doc.font('Khmer').fontSize(11)
+           .text(v2 || '—', col2X + 85, y, { width: 160 });
       }
-
-      const rowY      = doc.y;
-      const isCorrect = ans.isCorrect === 1 || ans.isCorrect === true;
-      const bg        = i % 2 === 0 ? '#f0f4ff' : '#ffffff';
-
-      doc.rect(50, rowY, 495, 22).fill(bg);
-      doc.fillColor('black').font('Khmer').fontSize(10);
-
-      const qShort = (ans.questionText || '').length > 55
-        ? ans.questionText.substring(0, 52) + '...'
-        : (ans.questionText || '');
-
-      doc.text(`${i + 1}`,                                  55,  rowY + 5, { width: 25 });
-      doc.text(qShort,                                       82,  rowY + 5, { width: 215 });
-      doc.text((ans.selectedOption || '—').toUpperCase(),    300, rowY + 5, { width: 55 });
-      doc.text(ans.correctAnswer.toUpperCase(),              358, rowY + 5, { width: 60 });
-
-      // ✅ ៣ កម្រិត
-      const rowResult = isCorrect ? 'ជាប់' : 'ធ្លាក់';
-      const rowColor  = isCorrect ? '#1a7a3a' : '#c0392b';
-
-      doc.fillColor(rowColor)
-         .font('Khmer-Bold').fontSize(10)
-         .text(rowResult,                                       422, rowY + 5, { width: 55 });
-
-      doc.fillColor('black').font('Khmer').fontSize(10)
-         .text(`${ans.pointsEarned}/${ans.points}`,          480, rowY + 5, { width: 55 });
-
-      doc.moveDown(1.6);
+      doc.moveDown(1.1);
     });
 
-    // ── Footer ───────────────────────────────────────────────
-    doc.moveDown(1);
+    doc.moveDown(0.3);
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.5);
+
+    // ════════════════════════════════════════════════════════
+    //  SCORE SUMMARY BOX
+    // ════════════════════════════════════════════════════════
+    const pct      = parseFloat(data.percentage).toFixed(1);
+    const pctNum   = parseFloat(pct);
+    const resLabel = pctNum >= 70 ? 'ជាប់' : pctNum >= 50 ? 'មធ្យម' : 'ធ្លាក់';
+    const resColor = pctNum >= 70 ? '#28a745' : pctNum >= 50 ? '#e67e22' : '#dc3545';
+    const boxBg    = pctNum >= 70 ? '#e8f5e9' : pctNum >= 50 ? '#fff8e1' : '#ffebee';
+
+    const boxY     = doc.y;
+    const correctCount  = answers.filter(a => a.isCorrect === 1 || a.isCorrect === true).length;
+    const incorrectCount = answers.length - correctCount;
+
+    doc.rect(50, boxY, 495, 65).fillAndStroke(boxBg, resColor);
+    doc.fillColor('black');
+
+    // Row 1: score + percentage + result
+    doc.font('Khmer-Bold').fontSize(14)
+       .text(`ពិន្ទុ: ${data.totalScore} / ${data.totalPoints}`, 65, boxY + 8, { width: 180 });
+    doc.font('Khmer-Bold').fontSize(22)
+       .fillColor(resColor)
+       .text(`${pct}%`, 265, boxY + 5, { width: 100 });
+    doc.font('Khmer-Bold').fontSize(16)
+       .fillColor(resColor)
+       .text(`[ ${resLabel} ]`, 375, boxY + 10, { width: 150 });
+
+    // Row 2: correct / incorrect count
+    doc.fillColor('#155724').font('Khmer').fontSize(11)
+       .text(`✓ ចម្លើយត្រឹមត្រូវ: ${correctCount}`, 65, boxY + 38, { width: 180 });
+    doc.fillColor('#721c24').font('Khmer').fontSize(11)
+       .text(`✗ ចម្លើយខុស: ${incorrectCount}`, 265, boxY + 38, { width: 180 });
+    doc.fillColor('#333').font('Khmer').fontSize(11)
+       .text(`សំណួរសរុប: ${answers.length}`, 440, boxY + 38, { width: 100 });
+
+    doc.fillColor('black');
+    doc.y = boxY + 75;
+
+    // ════════════════════════════════════════════════════════
+    //  COLOR LEGEND
+    // ════════════════════════════════════════════════════════
+    doc.moveDown(0.4);
+    const legY = doc.y;
+    doc.fontSize(10).font('Khmer').fillColor('#333')
+       .text('សញ្ញាពណ៌:', 50, legY, { continued: true });
+
+    // Green box
+    doc.rect(110, legY + 1, 12, 12).fill('#d4edda').stroke('#28a745');
+    doc.fillColor('#155724').text('  ចម្លើយត្រឹមត្រូវ (ជ្រើសរើស)', 124, legY, { continued: true });
+
+    // Blue box
+    doc.rect(295, legY + 1, 12, 12).fill('#cce5ff').stroke('#004085');
+    doc.fillColor('#004085').text('  ចម្លើយត្រូវ (មិនបានជ្រើស)', 309, legY, { continued: true });
+
+    // Red box
+    doc.rect(465, legY + 1, 12, 12).fill('#f8d7da').stroke('#721c24');
+    doc.fillColor('#721c24').text('  ចម្លើយខុស', 479, legY);
+
+    doc.fillColor('black');
+    doc.moveDown(0.8);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#cccccc');
+    doc.moveDown(0.5);
+
+    // ════════════════════════════════════════════════════════
+    //  QUESTION DETAIL SECTION
+    // ════════════════════════════════════════════════════════
+    doc.font('Khmer-Bold').fontSize(12).fillColor('#333333')
+       .text('លម្អិតសំណួរ និងចម្លើយ', { align: 'center' });
+    doc.moveDown(0.5);
+
+    const PAGE_BOTTOM = 790;
+    const optionMap   = { a: 'option_a', b: 'option_b', c: 'option_c', d: 'option_d' };
+    const optionLabels = ['a', 'b', 'c', 'd'];
+
+    answers.forEach((ans, idx) => {
+      const isCorrect    = ans.isCorrect === 1 || ans.isCorrect === true;
+      const selected     = (ans.selectedOption || '').toLowerCase();
+      const correct      = (ans.correctAnswer  || '').toLowerCase();
+
+      // ── Estimate block height before drawing ──
+      const qH         = doc.heightOfString(ans.questionText || '', { width: 440 }) + 10;
+      const optH        = optionLabels.reduce((sum, lbl) => {
+        const txt = ans[optionMap[lbl]] || '';
+        return sum + Math.max(doc.heightOfString(`${lbl}. ${txt}`, { width: 210 }) + 8, 20) + 3;
+      }, 0);
+      const blockHeight = qH + optH + 30;
+
+      // ── New page if not enough space ──
+      if (doc.y + blockHeight > PAGE_BOTTOM) {
+        doc.addPage();
+        // repeat mini-header on new page
+        doc.font('Khmer').fontSize(9).fillColor('#888')
+           .text(`${data.studentName}  |  ${data.examTitle}  |  ${pct}%`, 50, 30, { width: 495, align: 'center' });
+        doc.moveTo(50, 48).lineTo(545, 48).stroke('#cccccc');
+        doc.y = 58;
+      }
+
+      // ── Question box header ──
+      const qBoxY   = doc.y;
+      const qBg     = isCorrect ? '#e8f5e9' : '#fff3cd';
+      const qBorder = isCorrect ? '#28a745' : '#e67e22';
+
+      // Question number badge
+      doc.rect(50, qBoxY, 30, 22)
+         .fill(isCorrect ? '#28a745' : '#dc3545');
+      doc.fillColor('white').font('Khmer-Bold').fontSize(11)
+         .text(`${idx + 1}`, 50, qBoxY + 5, { width: 30, align: 'center' });
+
+      // Points badge (right side)
+      const ptsTxt = `${ans.pointsEarned}/${ans.points} ពិន្ទុ`;
+      doc.rect(460, qBoxY, 85, 22)
+         .fill(isCorrect ? '#28a745' : '#dc3545');
+      doc.fillColor('white').font('Khmer').fontSize(10)
+         .text(ptsTxt, 462, qBoxY + 5, { width: 81, align: 'center' });
+
+      // Question text background
+      const qTextH = doc.heightOfString(ans.questionText || '', { width: 390 }) + 12;
+      doc.rect(80, qBoxY, 380, Math.max(qTextH, 22)).fill(qBg).stroke(qBorder);
+      doc.fillColor('#1a1a1a').font('Khmer-Bold').fontSize(11)
+         .text(ans.questionText || '(គ្មានអត្ថបទ)', 85, qBoxY + 6, { width: 370 });
+
+      doc.y = qBoxY + Math.max(qTextH, 22) + 6;
+
+      // ── Options (2-column layout) ──
+      const optStartY = doc.y;
+      const colW      = 238;
+      const colGap    = 9;
+      const col1      = 50;
+      const col2      = col1 + colW + colGap;
+
+      let leftY  = optStartY;
+      let rightY = optStartY;
+
+      optionLabels.forEach((lbl, i) => {
+        const optText    = ans[optionMap[lbl]] || '';
+        const isThisCorr = lbl === correct;
+        const isThisSel  = lbl === selected;
+
+        const xPos = (i % 2 === 0) ? col1 : col2;
+        const yPos = (i % 2 === 0) ? leftY : rightY;
+
+        const h = drawOption(doc, lbl.toUpperCase(), optText,
+                             isThisCorr, isThisSel, xPos, yPos, colW);
+
+        if (i % 2 === 0) leftY  += h + 4;
+        else             rightY += h + 4;
+      });
+
+      doc.y = Math.max(leftY, rightY) + 6;
+
+      // ── Summary line ──
+      const sumY = doc.y;
+      doc.rect(50, sumY, 495, 20).fill('#f8f9fa').stroke('#dee2e6');
+      doc.fillColor('#004085').font('Khmer').fontSize(10)
+         .text(`ចម្លើយត្រឹមត្រូវ: ${correct.toUpperCase()}`, 60, sumY + 4, { continued: true });
+      doc.fillColor(isCorrect ? '#155724' : '#721c24')
+         .text(`   |   ចម្លើយសិស្ស: ${selected ? selected.toUpperCase() : '—'}`, { continued: true });
+      doc.fillColor(isCorrect ? '#155724' : '#721c24')
+         .font('Khmer-Bold')
+         .text(`   |   ${isCorrect ? '✓ ត្រឹមត្រូវ' : '✗ ខុស'}`);
+      doc.fillColor('black');
+
+      doc.moveDown(0.8);
+    });
+
+    // ════════════════════════════════════════════════════════
+    //  FOOTER
+    // ════════════════════════════════════════════════════════
+    doc.moveDown(1);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#cccccc');
+    doc.moveDown(0.4);
     doc.font('Khmer').fontSize(10).fillColor('#888888')
        .text('រៀបចំដោយលោកគ្រូ ម៉ាន់ វាសនា', { align: 'center' })
        .text(`កាលបរិច្ឆេទ: ${new Date().toLocaleDateString('en-GB')}`, { align: 'center' });
@@ -404,5 +540,3 @@ module.exports = {
   exportSubjectPerformance,
   exportExamResultPDF
 };
-
-
